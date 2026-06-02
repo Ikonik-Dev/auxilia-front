@@ -20,7 +20,7 @@ const allNavItems: NavItem[] = [
   { label: 'Utilisateurs',    icon: 'pi pi-users',           to: '/utilisateurs',  roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR'] },
   { label: 'Inscriptions',    icon: 'pi pi-user-plus',       to: '/inscriptions',  roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_RESPONSABLE_PED'] },
   { label: 'Évaluations',     icon: 'pi pi-check-circle',    to: '/evaluations',   roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_FORMATEUR'] },
-  { label: 'Assiduité',       icon: 'pi pi-calendar-check',  to: '/assiduite',     roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_FORMATEUR'] },
+  { label: 'Assiduité',       icon: 'pi pi-calendar-clock',  to: '/assiduite',     roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_FORMATEUR'] },
   { label: 'Statistiques',    icon: 'pi pi-chart-bar',       to: '/statistiques',  roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_RESPONSABLE_PED'] },
   { label: 'Mon Parcours',    icon: 'pi pi-map',             to: '/parcours',      roles: ['ROLE_USER'] },
   { label: 'Mes Documents',   icon: 'pi pi-file',            to: '/documents',     roles: ['ROLE_USER'] },
