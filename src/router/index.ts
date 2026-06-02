@@ -72,6 +72,12 @@ export const router = createRouter({
           meta: { roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_FORMATEUR'] },
         },
         {
+          path: 'formations/:id',
+          name: 'formation-detail',
+          component: () => import('@/pages/formations/FormationDetailPage.vue'),
+          meta: { roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_FORMATEUR'] },
+        },
+        {
           path: 'utilisateurs',
           name: 'utilisateurs',
           component: () => import('@/pages/utilisateurs/index.vue'),
