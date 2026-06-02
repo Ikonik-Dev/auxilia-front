@@ -2,36 +2,59 @@ import { computed, ref } from 'vue'
 import {
   apiSchedulesGetCollection,
   apiAttendancesGetCollection,
+  apiEnrollmentsGetCollection,
   apiAttendancesPost,
   apiAttendancesIdPut,
 } from '@/api'
-import type { ScheduleScheduleRead, AttendanceAttendanceRead } from '@/api'
+import type { ScheduleScheduleRead, AttendanceAttendanceRead, EnrollmentEnrollmentRead } from '@/api'
+
+export interface Participant {
+  userIri: string
+  attendanceId?: number
+  savedStatus?: string
+}
 
 export function useAssiduite() {
-  const schedules = ref<ScheduleScheduleRead[]>([])
-  const attendances = ref<AttendanceAttendanceRead[]>([])
+  const schedules    = ref<ScheduleScheduleRead[]>([])
+  const attendances  = ref<AttendanceAttendanceRead[]>([])
+  const enrollments  = ref<EnrollmentEnrollmentRead[]>([])
   const selectedSchedule = ref<ScheduleScheduleRead | null>(null)
-  const loading = ref(false)
-  const loadingAttendances = ref(false)
-  const error = ref<string | null>(null)
+  const loading             = ref(false)
+  const loadingAttendances  = ref(false)
+  const error               = ref<string | null>(null)
 
-  // Présences de la séance sélectionnée (filtre par IRI de la séance)
-  const currentAttendances = computed(() => {
+  // Tous les inscrits actifs de la session + leur présence existante pour ce schedule
+  const participants = computed((): Participant[] => {
     if (!selectedSchedule.value?.id) return []
-    const iri = `/api/schedules/${selectedSchedule.value.id}`
-    return attendances.value.filter((a) => a.schedule === iri)
+    const sessionId   = selectedSchedule.value.session?.id
+    const scheduleIri = `/api/schedules/${selectedSchedule.value.id}`
+    if (!sessionId) return []
+
+    return enrollments.value
+      .filter((e) => e.session.id === sessionId && e.status === 'active')
+      .map((e) => {
+        const existing = attendances.value.find(
+          (a) => a.user === e.user && a.schedule === scheduleIri,
+        )
+        return {
+          userIri:      e.user,
+          attendanceId: existing?.id,
+          savedStatus:  existing?.status,
+        }
+      })
   })
 
-  async function fetchSchedules(page = 1) {
+  async function fetchSchedules() {
     loading.value = true
     error.value = null
     try {
-      const { data, error: apiError } = await apiSchedulesGetCollection({ query: { page } })
-      if (apiError) {
-        error.value = 'Impossible de charger les séances.'
-      } else {
-        schedules.value = data ?? []
-      }
+      const [schRes, enrRes] = await Promise.all([
+        apiSchedulesGetCollection({ query: { page: 1 } }),
+        apiEnrollmentsGetCollection({ query: { page: 1 } }),
+      ])
+      if (schRes.error) error.value = 'Impossible de charger les séances.'
+      else schedules.value = schRes.data ?? []
+      if (!enrRes.error) enrollments.value = enrRes.data ?? []
     } catch {
       error.value = 'Impossible de charger les séances.'
     } finally {
@@ -40,51 +63,65 @@ export function useAssiduite() {
   }
 
   async function selectSchedule(schedule: ScheduleScheduleRead) {
-    selectedSchedule.value = schedule
+    selectedSchedule.value   = schedule
     loadingAttendances.value = true
     try {
       const { data } = await apiAttendancesGetCollection({ query: { page: 1 } })
       attendances.value = data ?? []
     } catch {
-      // silencieux — les présences resteront vides
+      attendances.value = []
     } finally {
       loadingAttendances.value = false
     }
   }
 
-  async function saveAttendance(
-    userIri: string,
-    status: string,
-    existingId?: number,
-  ): Promise<void> {
-    if (!selectedSchedule.value?.id) return
+  // Enregistre toutes les modifications en batch (POST pour nouveau, PUT pour existant)
+  async function saveBatch(
+    localStatuses: Map<string, string>,
+  ): Promise<{ saved: number; errors: number }> {
+    if (!selectedSchedule.value?.id) return { saved: 0, errors: 0 }
     const scheduleIri = `/api/schedules/${selectedSchedule.value.id}`
-    if (existingId) {
-      const { data } = await apiAttendancesIdPut({
-        path: { id: String(existingId) },
-        body: { status, schedule: scheduleIri, user: userIri },
-      })
-      if (data) {
-        const idx = attendances.value.findIndex((a) => a.id === existingId)
-        if (idx !== -1) attendances.value[idx] = data
-      }
-    } else {
-      const { data } = await apiAttendancesPost({
-        body: { status, schedule: scheduleIri, user: userIri },
-      })
-      if (data) attendances.value.push(data)
-    }
+    let saved = 0, errors = 0
+
+    await Promise.allSettled(
+      [...localStatuses.entries()].map(async ([userIri, status]) => {
+        const existing = attendances.value.find(
+          (a) => a.user === userIri && a.schedule === scheduleIri,
+        )
+        try {
+          if (existing?.id) {
+            const { data } = await apiAttendancesIdPut({
+              path: { id: String(existing.id) },
+              body: { status, schedule: scheduleIri, user: userIri },
+            })
+            if (data) {
+              const idx = attendances.value.findIndex((a) => a.id === existing.id)
+              if (idx !== -1) attendances.value[idx] = data
+            }
+          } else {
+            const { data } = await apiAttendancesPost({
+              body: { status, schedule: scheduleIri, user: userIri },
+            })
+            if (data) attendances.value.push(data)
+          }
+          saved++
+        } catch {
+          errors++
+        }
+      }),
+    )
+    return { saved, errors }
   }
 
   return {
     schedules,
+    participants,
     selectedSchedule,
-    currentAttendances,
     loading,
     loadingAttendances,
     error,
     fetchSchedules,
     selectSchedule,
-    saveAttendance,
+    saveBatch,
   }
 }
