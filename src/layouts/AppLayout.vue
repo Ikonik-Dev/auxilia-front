@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import NotificationsPanel from '@/components/layout/NotificationsPanel.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -44,12 +45,13 @@ async function handleLogout() {
 
     <!-- ── Sidebar ── -->
     <aside class="sidebar">
-      <!-- Logo -->
+      <!-- Logo + cloche notifications -->
       <div class="sidebar-header">
         <div class="sidebar-logo-mark">
           <i class="pi pi-graduation-cap" />
         </div>
         <span class="sidebar-logo-text">Auxilium</span>
+        <NotificationsPanel />
       </div>
 
       <!-- Navigation -->
