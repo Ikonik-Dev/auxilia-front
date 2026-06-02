@@ -2,9 +2,6 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import Button from 'primevue/button'
-import Avatar from 'primevue/avatar'
-import Divider from 'primevue/divider'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -17,48 +14,16 @@ interface NavItem {
 }
 
 const allNavItems: NavItem[] = [
-  // Admin / Directeur
-  { label: 'Tableau de bord', icon: 'pi pi-home', to: '/dashboard', roles: [] },
-  {
-    label: 'Formations',
-    icon: 'pi pi-book',
-    to: '/formations',
-    roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_FORMATEUR'],
-  },
-  {
-    label: 'Utilisateurs',
-    icon: 'pi pi-users',
-    to: '/utilisateurs',
-    roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR'],
-  },
-  {
-    label: 'Inscriptions',
-    icon: 'pi pi-user-plus',
-    to: '/inscriptions',
-    roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_RESPONSABLE_PED'],
-  },
-  {
-    label: 'Évaluations',
-    icon: 'pi pi-check-circle',
-    to: '/evaluations',
-    roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_FORMATEUR'],
-  },
-  {
-    label: 'Assiduité',
-    icon: 'pi pi-calendar-check',
-    to: '/assiduite',
-    roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_FORMATEUR'],
-  },
-  {
-    label: 'Statistiques',
-    icon: 'pi pi-chart-bar',
-    to: '/statistiques',
-    roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_RESPONSABLE_PED'],
-  },
-  // Stagiaire
-  { label: 'Mon Parcours', icon: 'pi pi-map', to: '/parcours', roles: ['ROLE_USER'] },
-  { label: 'Mes Documents', icon: 'pi pi-file', to: '/documents', roles: ['ROLE_USER'] },
-  { label: 'Messages', icon: 'pi pi-envelope', to: '/messages', roles: [] },
+  { label: 'Tableau de bord', icon: 'pi pi-home',           to: '/dashboard',     roles: [] },
+  { label: 'Formations',      icon: 'pi pi-book',            to: '/formations',    roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_FORMATEUR'] },
+  { label: 'Utilisateurs',    icon: 'pi pi-users',           to: '/utilisateurs',  roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR'] },
+  { label: 'Inscriptions',    icon: 'pi pi-user-plus',       to: '/inscriptions',  roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_RESPONSABLE_PED'] },
+  { label: 'Évaluations',     icon: 'pi pi-check-circle',    to: '/evaluations',   roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_FORMATEUR'] },
+  { label: 'Assiduité',       icon: 'pi pi-calendar-check',  to: '/assiduite',     roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_FORMATEUR'] },
+  { label: 'Statistiques',    icon: 'pi pi-chart-bar',       to: '/statistiques',  roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_RESPONSABLE_PED'] },
+  { label: 'Mon Parcours',    icon: 'pi pi-map',             to: '/parcours',      roles: ['ROLE_USER'] },
+  { label: 'Mes Documents',   icon: 'pi pi-file',            to: '/documents',     roles: ['ROLE_USER'] },
+  { label: 'Messages',        icon: 'pi pi-envelope',        to: '/messages',      roles: [] },
 ]
 
 const navItems = computed<NavItem[]>(() =>
@@ -76,13 +41,19 @@ async function handleLogout() {
 
 <template>
   <div class="app-layout">
-    <!-- Sidebar -->
+
+    <!-- ── Sidebar ── -->
     <aside class="sidebar">
+      <!-- Logo -->
       <div class="sidebar-header">
-        <span class="sidebar-logo">Auxilia LMS</span>
+        <div class="sidebar-logo-mark">
+          <i class="pi pi-graduation-cap" />
+        </div>
+        <span class="sidebar-logo-text">Auxilium</span>
       </div>
 
-      <nav class="sidebar-nav">
+      <!-- Navigation -->
+      <nav class="sidebar-nav" aria-label="Navigation principale">
         <RouterLink
           v-for="item in navItems"
           :key="item.to"
@@ -90,29 +61,33 @@ async function handleLogout() {
           class="nav-item"
           active-class="nav-item--active"
         >
-          <i :class="item.icon" />
-          <span>{{ item.label }}</span>
+          <span class="nav-icon-wrap">
+            <i :class="item.icon" />
+          </span>
+          <span class="nav-label">{{ item.label }}</span>
         </RouterLink>
       </nav>
 
+      <!-- Footer user area -->
       <div class="sidebar-footer">
-        <Divider />
-        <div class="user-info">
-          <Avatar icon="pi pi-user" shape="circle" />
-          <span class="user-email">{{ auth.userEmail }}</span>
+        <div class="user-card">
+          <div class="user-avatar">
+            <i class="pi pi-user" />
+          </div>
+          <div class="user-info">
+            <span class="user-name">{{ auth.userName }}</span>
+            <span class="user-status">En ligne</span>
+          </div>
         </div>
-        <Button
-          label="Déconnexion"
-          icon="pi pi-sign-out"
-          severity="secondary"
-          text
-          size="small"
-          @click="handleLogout"
-        />
+
+        <button class="logout-btn" @click="handleLogout">
+          <i class="pi pi-sign-out" />
+          <span>Déconnexion</span>
+        </button>
       </div>
     </aside>
 
-    <!-- Main content -->
+    <!-- ── Main content ── -->
     <main class="main-content">
       <RouterView />
     </main>
@@ -120,88 +95,217 @@ async function handleLogout() {
 </template>
 
 <style scoped>
+/* ── Layout shell ── */
 .app-layout {
   display: flex;
   min-height: 100vh;
 }
 
+/* ── Sidebar ── */
 .sidebar {
-  width: 260px;
-  min-width: 260px;
-  background: var(--p-surface-card);
-  border-right: 1px solid var(--p-surface-border);
+  width: 268px;
+  min-width: 268px;
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-right: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 4px 0 28px rgba(139, 92, 246, 0.07);
   display: flex;
   flex-direction: column;
-  padding: 1rem 0;
+  padding: 1.5rem 0 1rem;
+  position: relative;
+  z-index: 10;
 }
 
+/* Logo */
 .sidebar-header {
-  padding: 0 1.25rem 1rem;
-  border-bottom: 1px solid var(--p-surface-border);
-  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 1.25rem 1.5rem;
+  border-bottom: 1px solid rgba(196, 181, 253, 0.25);
+  margin-bottom: 0.75rem;
 }
 
-.sidebar-logo {
-  font-size: 1.25rem;
+.sidebar-logo-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  background: linear-gradient(135deg, #a78bfa 0%, #818cf8 100%);
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.3);
+  flex-shrink: 0;
+}
+
+.sidebar-logo-mark .pi {
+  font-size: 1rem;
+  color: #fff;
+}
+
+.sidebar-logo-text {
+  font-size: 1.15rem;
   font-weight: 700;
-  color: var(--p-primary-color);
+  color: #4c1d95;
+  letter-spacing: -0.02em;
 }
 
+/* Nav */
 .sidebar-nav {
   flex: 1;
-  padding: 0.5rem 0.75rem;
+  padding: 0.25rem 0.875rem;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.2rem;
+  overflow-y: auto;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.625rem 0.875rem;
-  border-radius: var(--p-border-radius-md);
-  color: var(--p-text-color);
+  gap: 0.875rem;
+  padding: 0.65rem 0.875rem;
+  border-radius: 14px;
+  color: #5b21b6;
   text-decoration: none;
-  font-size: 0.9rem;
-  transition: background 0.15s;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background 0.16s ease, transform 0.16s ease, color 0.16s ease;
 }
 
 .nav-item:hover {
-  background: var(--p-surface-hover);
+  background: rgba(167, 139, 250, 0.13);
+  transform: translateX(3px);
+  color: #4c1d95;
 }
 
 .nav-item--active {
-  background: var(--p-primary-100);
-  color: var(--p-primary-color);
+  background: linear-gradient(
+    135deg,
+    rgba(167, 139, 250, 0.22) 0%,
+    rgba(129, 140, 248, 0.15) 100%
+  );
+  color: #6d28d9;
   font-weight: 600;
+  box-shadow: 0 2px 12px rgba(139, 92, 246, 0.12);
 }
 
+.nav-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.55);
+  flex-shrink: 0;
+  font-size: 0.9rem;
+  transition: background 0.16s;
+}
+
+.nav-item--active .nav-icon-wrap {
+  background: rgba(167, 139, 250, 0.25);
+}
+
+.nav-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Footer */
 .sidebar-footer {
-  padding: 0 0.75rem;
+  padding: 0.75rem 0.875rem 0;
+  border-top: 1px solid rgba(196, 181, 253, 0.25);
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.user-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.875rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.user-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #c4b5fd, #93c5fd);
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  color: #4c1d95;
 }
 
 .user-info {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0.25rem;
-  margin-bottom: 0.25rem;
+  flex-direction: column;
+  min-width: 0;
 }
 
-.user-email {
-  font-size: 0.8rem;
-  color: var(--p-text-muted-color);
+.user-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #4c1d95;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 160px;
 }
 
+.user-status {
+  font-size: 0.7rem;
+  color: #7c6fa0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.user-status::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #86efac;
+}
+
+.logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 0.6rem 0.875rem;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: #7c6fa0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.16s, color 0.16s;
+  text-align: left;
+}
+
+.logout-btn:hover {
+  background: rgba(252, 165, 165, 0.18);
+  color: #dc2626;
+}
+
+/* ── Main content ── */
 .main-content {
   flex: 1;
-  background: var(--p-surface-ground);
-  padding: 2rem;
+  padding: 2rem 2.25rem;
   overflow: auto;
+  min-width: 0;
 }
 </style>

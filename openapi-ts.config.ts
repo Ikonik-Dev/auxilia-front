@@ -5,6 +5,6 @@ export default defineConfig({
   input: 'http://localhost:8080/api/docs.json',
   output: {
     path: 'src/api/generated',
-    format: 'prettier',
   },
+  postProcess: ['prettier'],
 })
