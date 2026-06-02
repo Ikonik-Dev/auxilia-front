@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useParcours } from '@/composables/useParcours'
 import type { LessonRow } from '@/composables/useParcours'
 import MilestonesList from '@/components/parcours/MilestonesList.vue'
@@ -42,7 +42,6 @@ function buildOptions() {
 }
 
 // Rebuild options quand les enrollments chargent
-import { watch } from 'vue'
 watch(enrollments, buildOptions)
 
 // ── Accordion des modules ──

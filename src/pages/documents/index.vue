@@ -9,13 +9,11 @@ import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
-import Textarea from 'primevue/textarea'
 import Skeleton from 'primevue/skeleton'
 import { useToast } from 'primevue/usetoast'
 import Toast from 'primevue/toast'
 import type { DocumentDocumentRead } from '@/api'
 
-const auth  = useToast()
 const toast = useToast()
 const { documents, loading, error, fetchDocuments, downloadDocument, uploadDocument } = useDocuments()
 const authStore = useAuthStore()

@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useAuthStore } from '@/stores/auth'
 import { useMessages } from '@/composables/useMessages'
 import { apiUsersGetCollection } from '@/api'
 import type { MessageMessageRead } from '@/api'
-import Tag from 'primevue/tag'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
@@ -14,8 +12,7 @@ import Skeleton from 'primevue/skeleton'
 import { useToast } from 'primevue/usetoast'
 import Toast from 'primevue/toast'
 
-const toast     = useToast()
-const authStore = useAuthStore()
+const toast = useToast()
 const { threads, unreadCount, loading, error, fetchMessages, repliesOf, getUserName, sendMessage } = useMessages()
 
 onMounted(() => {
