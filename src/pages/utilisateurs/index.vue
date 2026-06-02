@@ -1,86 +1,84 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import { useUtilisateurs } from '@/composables/useUtilisateurs'
+import type { UserFormPayload } from '@/composables/useUtilisateurs'
+import UserForm from '@/components/utilisateurs/UserForm.vue'
+import type { UserUserRead, UserUserWrite } from '@/api'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
+import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
 import Skeleton from 'primevue/skeleton'
-import { useUtilisateurs } from '@/composables/useUtilisateurs'
+import { useToast } from 'primevue/usetoast'
+import Toast from 'primevue/toast'
 
-const { utilisateurs, loading, error, fetchUtilisateurs } = useUtilisateurs()
+const auth = useAuthStore()
+const toast = useToast()
+const { utilisateurs, loading, error, fetchUtilisateurs, createUser, updateUser, deleteUser } = useUtilisateurs()
+
+const canWrite = computed(() => auth.hasRole('ROLE_ADMIN') || auth.hasRole('ROLE_DIRECTEUR'))
 
 onMounted(() => {
   document.title = 'Utilisateurs — Auxilium'
   fetchUtilisateurs()
 })
 
-// --- Filtres ---
+// ── Filtres ──
 const search = ref('')
 const filterRole = ref('all')
+const filterStatus = ref<'all' | 'active' | 'inactive'>('all')
 
-// Rôles affichables (excluant ROLE_USER de base)
-const KNOWN_ROLES = [
-  'ROLE_ADMIN',
-  'ROLE_DIRECTEUR',
-  'ROLE_FORMATEUR',
-  'ROLE_RESPONSABLE_PED',
-  'ROLE_USER',
-]
+const KNOWN_ROLES = ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_FORMATEUR', 'ROLE_RESPONSABLE_PED', 'ROLE_USER']
 
 const roleOptions = [
-  { label: 'Tous les rôles', value: 'all' },
-  { label: 'Admin', value: 'ROLE_ADMIN' },
-  { label: 'Directeur', value: 'ROLE_DIRECTEUR' },
-  { label: 'Formateur', value: 'ROLE_FORMATEUR' },
-  { label: 'Responsable pédago.', value: 'ROLE_RESPONSABLE_PED' },
-  { label: 'Stagiaire', value: 'ROLE_USER' },
+  { label: 'Tous les rôles',      value: 'all' },
+  { label: 'Admin',               value: 'ROLE_ADMIN' },
+  { label: 'Directeur',           value: 'ROLE_DIRECTEUR' },
+  { label: 'Formateur',           value: 'ROLE_FORMATEUR' },
+  { label: 'Responsable péda.',   value: 'ROLE_RESPONSABLE_PED' },
+  { label: 'Stagiaire',           value: 'ROLE_USER' },
 ]
-
-const filterStatus = ref<'all' | 'active' | 'inactive'>('all')
 const statusOptions = [
-  { label: 'Tous', value: 'all' },
-  { label: 'Actifs', value: 'active' },
+  { label: 'Tous',     value: 'all' },
+  { label: 'Actifs',   value: 'active' },
   { label: 'Inactifs', value: 'inactive' },
 ]
 
 const filtered = computed(() => {
   let list = utilisateurs.value
   const q = search.value.trim().toLowerCase()
-  if (q) {
-    list = list.filter(
-      (u) =>
-        u.firstName.toLowerCase().includes(q) ||
-        u.lastName.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q),
-    )
-  }
-  if (filterRole.value !== 'all') {
-    list = list.filter((u) => u.roles.includes(filterRole.value))
-  }
-  if (filterStatus.value === 'active') list = list.filter((u) => u.isActive)
+  if (q) list = list.filter((u) =>
+    u.firstName.toLowerCase().includes(q) ||
+    u.lastName.toLowerCase().includes(q) ||
+    u.email.toLowerCase().includes(q),
+  )
+  if (filterRole.value !== 'all') list = list.filter((u) => u.roles.includes(filterRole.value))
+  if (filterStatus.value === 'active')   list = list.filter((u) => u.isActive)
   if (filterStatus.value === 'inactive') list = list.filter((u) => !u.isActive)
   return list
 })
 
-// --- Helpers ---
+// ── Helpers ──
 const ROLE_LABELS: Record<string, string> = {
-  ROLE_ADMIN: 'Admin',
-  ROLE_DIRECTEUR: 'Directeur',
-  ROLE_FORMATEUR: 'Formateur',
+  ROLE_ADMIN:           'Admin',
+  ROLE_DIRECTEUR:       'Directeur',
+  ROLE_FORMATEUR:       'Formateur',
   ROLE_RESPONSABLE_PED: 'Resp. péda.',
-  ROLE_USER: 'Stagiaire',
+  ROLE_USER:            'Stagiaire',
 }
-
 const ROLE_SEVERITY: Record<string, 'danger' | 'warn' | 'info' | 'secondary'> = {
-  ROLE_ADMIN: 'danger',
-  ROLE_DIRECTEUR: 'warn',
-  ROLE_FORMATEUR: 'info',
+  ROLE_ADMIN:           'danger',
+  ROLE_DIRECTEUR:       'warn',
+  ROLE_FORMATEUR:       'info',
   ROLE_RESPONSABLE_PED: 'info',
-  ROLE_USER: 'secondary',
+  ROLE_USER:            'secondary',
 }
 
-function displayRoles(roles: Array<string | null>): string[] {
+function displayRoles(roles: Array<string | null>) {
   return roles.filter((r): r is string => r !== null && KNOWN_ROLES.includes(r))
 }
 
@@ -88,23 +86,88 @@ function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('fr-FR')
 }
+
+// ── Dialog création / édition ──
+const showForm = ref(false)
+const editTarget = ref<UserUserRead | null>(null)
+const saving = ref(false)
+const saveError = ref<string | null>(null)
+
+function openCreate() {
+  editTarget.value = null
+  saveError.value = null
+  showForm.value = true
+}
+
+function openEdit(user: UserUserRead) {
+  editTarget.value = user
+  saveError.value = null
+  showForm.value = true
+}
+
+async function handleSubmit(payload: UserFormPayload & { password?: string }) {
+  saving.value = true
+  saveError.value = null
+  try {
+    if (editTarget.value?.id) {
+      await updateUser(editTarget.value.id, payload)
+      toast.add({ severity: 'success', summary: 'Utilisateur modifié', life: 3000 })
+    } else {
+      await createUser(payload as UserUserWrite)
+      toast.add({ severity: 'success', summary: 'Utilisateur créé', life: 3000 })
+    }
+    showForm.value = false
+    await fetchUtilisateurs()
+  } catch {
+    saveError.value = 'Une erreur est survenue. Vérifiez les données et réessayez.'
+  } finally {
+    saving.value = false
+  }
+}
+
+// ── Dialog suppression ──
+const showDeleteConfirm = ref(false)
+const deleteTarget = ref<UserUserRead | null>(null)
+const deleting = ref(false)
+
+function openDelete(user: UserUserRead) {
+  deleteTarget.value = user
+  showDeleteConfirm.value = true
+}
+
+async function handleDelete() {
+  if (!deleteTarget.value?.id) return
+  deleting.value = true
+  const ok = await deleteUser(deleteTarget.value.id)
+  deleting.value = false
+  if (ok) {
+    toast.add({ severity: 'success', summary: 'Utilisateur supprimé', life: 3000 })
+    showDeleteConfirm.value = false
+    await fetchUtilisateurs()
+  } else {
+    toast.add({ severity: 'error', summary: 'Suppression impossible', life: 4000 })
+    showDeleteConfirm.value = false
+  }
+}
 </script>
 
 <template>
   <div class="utilisateurs-page" :aria-busy="loading ? 'true' : undefined">
+    <Toast />
+
     <div class="page-header">
       <h1>Utilisateurs</h1>
+      <Button v-if="canWrite" label="Nouvel utilisateur" icon="pi pi-user-plus" @click="openCreate" />
     </div>
 
-    <!-- Erreur -->
-    <div v-if="error" role="alert" aria-live="polite" class="error-message">
-      <i class="pi pi-exclamation-triangle" aria-hidden="true" />
-      {{ error }}
+    <!-- Erreur chargement -->
+    <div v-if="error" role="alert" aria-live="polite" class="dash-error">
+      <i class="pi pi-exclamation-triangle" aria-hidden="true" /> {{ error }}
     </div>
 
     <!-- Chargement -->
-    <div v-else-if="loading" class="skeleton-list" aria-label="Chargement des utilisateurs en cours">
-      <Skeleton v-for="i in 6" :key="i" height="2.75rem" class="skeleton-row" />
+    <div v-else-if="loading" class="list-skeleton" aria-label="Chargement des utilisateurs">
+      <Skeleton v-for="i in 6" :key="i" height="2.75rem" border-radius="10px" />
     </div>
 
     <!-- Contenu -->
@@ -140,15 +203,21 @@ function formatDate(iso: string | null | undefined): string {
         :rows="20"
         :rows-per-page-options="[10, 20, 50]"
         aria-label="Liste des utilisateurs"
-        class="utilisateurs-table"
+        class="glass-table"
       >
         <template #empty>
-          <span class="table-empty">Aucun utilisateur trouvé.</span>
+          <div class="empty-state">
+            <i class="pi pi-users" />
+            <p>Aucun utilisateur trouvé.</p>
+          </div>
         </template>
 
         <Column header="Nom" sortable sort-field="lastName" style="min-width: 180px">
           <template #body="{ data }">
-            {{ data.firstName }} {{ data.lastName }}
+            <div class="user-cell">
+              <div class="user-avatar-sm">{{ data.firstName[0] }}{{ data.lastName[0] }}</div>
+              <span>{{ data.firstName }} {{ data.lastName }}</span>
+            </div>
           </template>
         </Column>
 
@@ -156,40 +225,94 @@ function formatDate(iso: string | null | undefined): string {
 
         <Column header="Rôles" style="min-width: 200px">
           <template #body="{ data }">
-            <span class="role-tags">
+            <div class="role-tags">
               <Tag
                 v-for="role in displayRoles(data.roles)"
                 :key="role"
                 :value="ROLE_LABELS[role] ?? role"
                 :severity="ROLE_SEVERITY[role] ?? 'secondary'"
-                class="role-tag"
               />
-            </span>
+            </div>
           </template>
         </Column>
 
         <Column header="Statut" style="width: 100px">
           <template #body="{ data }">
-            <Tag
-              :value="data.isActive ? 'Actif' : 'Inactif'"
-              :severity="data.isActive ? 'success' : 'secondary'"
-            />
+            <Tag :value="data.isActive ? 'Actif' : 'Inactif'" :severity="data.isActive ? 'success' : 'secondary'" />
           </template>
         </Column>
 
         <Column header="Dernière connexion" style="width: 160px">
-          <template #body="{ data }">
-            {{ formatDate(data.lastLoginAt) }}
-          </template>
+          <template #body="{ data }">{{ formatDate(data.lastLoginAt) }}</template>
         </Column>
 
         <Column header="Créé le" style="width: 110px">
+          <template #body="{ data }">{{ formatDate(data.createdAt) }}</template>
+        </Column>
+
+        <Column v-if="canWrite" header="" style="width: 90px">
           <template #body="{ data }">
-            {{ formatDate(data.createdAt) }}
+            <div class="row-actions">
+              <Button
+                icon="pi pi-pencil"
+                text
+                rounded
+                severity="secondary"
+                size="small"
+                aria-label="Modifier l'utilisateur"
+                @click.stop="openEdit(data)"
+              />
+              <Button
+                icon="pi pi-trash"
+                text
+                rounded
+                severity="danger"
+                size="small"
+                aria-label="Supprimer l'utilisateur"
+                @click.stop="openDelete(data)"
+              />
+            </div>
           </template>
         </Column>
       </DataTable>
     </template>
+
+    <!-- Dialog création / édition -->
+    <Dialog
+      v-model:visible="showForm"
+      modal
+      :header="editTarget ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur'"
+      :style="{ width: '620px', maxWidth: '95vw' }"
+      :draggable="false"
+      class="glass-dialog"
+    >
+      <UserForm
+        :user="editTarget"
+        :saving="saving"
+        :save-error="saveError"
+        @submit="handleSubmit"
+        @cancel="showForm = false"
+      />
+    </Dialog>
+
+    <!-- Dialog suppression -->
+    <Dialog
+      v-model:visible="showDeleteConfirm"
+      modal
+      header="Supprimer l'utilisateur"
+      :style="{ width: '420px' }"
+      :draggable="false"
+      class="glass-dialog"
+    >
+      <p class="delete-msg">
+        Supprimer <strong>{{ deleteTarget?.firstName }} {{ deleteTarget?.lastName }}</strong> ?
+        L'utilisateur sera désactivé (soft delete) et ne pourra plus se connecter.
+      </p>
+      <div class="delete-actions">
+        <Button label="Annuler" severity="secondary" text @click="showDeleteConfirm = false" />
+        <Button label="Supprimer" icon="pi pi-trash" severity="danger" :loading="deleting" @click="handleDelete" />
+      </div>
+    </Dialog>
   </div>
 </template>
 
@@ -200,31 +323,10 @@ function formatDate(iso: string | null | undefined): string {
   gap: 1.25rem;
 }
 
-.page-header h1 {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-}
-
-.error-message {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.875rem 1rem;
-  border-radius: var(--p-border-radius-md);
-  background: var(--p-red-100);
-  color: var(--p-red-700);
-  font-size: 0.9rem;
-}
-
-.skeleton-list {
+.list-skeleton {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-}
-
-.skeleton-row {
-  border-radius: var(--p-border-radius-md);
 }
 
 .filters {
@@ -233,14 +335,58 @@ function formatDate(iso: string | null | undefined): string {
   flex-wrap: wrap;
 }
 
-.filter-search {
-  flex: 1;
-  min-width: 200px;
+.filter-search { flex: 1; min-width: 200px; }
+.filter-role, .filter-status { width: 180px; }
+
+/* Table glass */
+.glass-table {
+  background: rgba(255, 255, 255, 0.45) !important;
+  backdrop-filter: blur(14px);
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.55);
 }
 
-.filter-role,
-.filter-status {
-  width: 180px;
+:deep(.p-datatable-header-cell) {
+  background: rgba(237, 233, 254, 0.6) !important;
+  color: #5b21b6 !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  border-bottom: 1px solid rgba(196, 181, 253, 0.3) !important;
+}
+
+:deep(.p-datatable-tbody > tr) {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(196, 181, 253, 0.12) !important;
+  transition: background 0.15s;
+}
+
+:deep(.p-datatable-tbody > tr:hover) {
+  background: rgba(167, 139, 250, 0.07) !important;
+}
+
+/* User avatar initials */
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.user-avatar-sm {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #c4b5fd, #93c5fd);
+  color: #4c1d95;
+  font-size: 0.625rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  text-transform: uppercase;
 }
 
 .role-tags {
@@ -249,12 +395,71 @@ function formatDate(iso: string | null | undefined): string {
   gap: 0.25rem;
 }
 
-.role-tag {
-  font-size: 0.75rem;
+.row-actions {
+  display: flex;
+  gap: 0.25rem;
+  justify-content: flex-end;
 }
 
-.table-empty {
-  color: var(--p-text-muted-color);
-  font-style: italic;
+/* Error / empty */
+.dash-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(254, 202, 202, 0.4);
+  border: 1px solid rgba(252, 165, 165, 0.5);
+  color: #dc2626;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 3rem 1rem;
+  color: #7c6fa0;
+}
+
+.empty-state .pi { font-size: 2rem; opacity: 0.4; }
+.empty-state p { margin: 0; font-size: 0.9rem; }
+
+/* Dialogs */
+:deep(.glass-dialog .p-dialog) {
+  background: rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: blur(24px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.65) !important;
+  border-radius: 20px !important;
+}
+
+:deep(.glass-dialog .p-dialog-header) {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(196, 181, 253, 0.2) !important;
+  padding: 1.25rem 1.5rem !important;
+}
+
+:deep(.glass-dialog .p-dialog-title) {
+  font-size: 1.1rem !important;
+  font-weight: 700 !important;
+  color: #4c1d95 !important;
+}
+
+:deep(.glass-dialog .p-dialog-content) {
+  background: transparent !important;
+  padding: 1.5rem !important;
+}
+
+.delete-msg {
+  margin: 0 0 1.5rem;
+  color: #374151;
+  line-height: 1.6;
+}
+
+.delete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
 }
 </style>
