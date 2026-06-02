@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import { useEvaluations } from '@/composables/useEvaluations'
+import { apiUsersGetCollection } from '@/api'
+import type { EvaluationSubmissionSubmissionRead } from '@/api'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
@@ -8,149 +12,235 @@ import TabPanel from 'primevue/tabpanel'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
+import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
+import InputNumber from 'primevue/inputnumber'
+import Textarea from 'primevue/textarea'
 import Skeleton from 'primevue/skeleton'
-import { useEvaluations } from '@/composables/useEvaluations'
-import { useAuthStore } from '@/stores/auth'
+import { useToast } from 'primevue/usetoast'
+import Toast from 'primevue/toast'
 
 const auth = useAuthStore()
-const { evaluations, pendingGrading, loading, error, fetchEvaluations } = useEvaluations()
-const activeTab = ref('evaluations')
+const toast = useToast()
+const { evaluations, pendingGrading, loading, error, fetchEvaluations, gradeSubmission } =
+  useEvaluations()
 
-const isFormateur = auth.hasRole('ROLE_FORMATEUR') || auth.hasRole('ROLE_ADMIN') || auth.hasRole('ROLE_DIRECTEUR')
+const activeTab = ref('evaluations')
+const canGrade = computed(() =>
+  auth.hasRole('ROLE_FORMATEUR') || auth.hasRole('ROLE_ADMIN') || auth.hasRole('ROLE_DIRECTEUR'),
+)
+
+// ── User lookup ──
+const userMap = ref(new Map<string, string>())
+
+async function loadUsers() {
+  const { data } = await apiUsersGetCollection()
+  const map = new Map<string, string>()
+  for (const u of data ?? []) {
+    if (u.id) map.set(`/api/users/${u.id}`, `${u.firstName} ${u.lastName}`)
+  }
+  userMap.value = map
+}
+
+function getUserName(iri: string | null | undefined): string {
+  if (!iri) return '—'
+  return userMap.value.get(iri) ?? `#${iri.split('/').pop()}`
+}
+
+// ── Evaluation lookup ──
+const evalMap = computed(() => {
+  const map = new Map<string, string>()
+  for (const ev of evaluations.value) {
+    if (ev.id) map.set(`/api/evaluations/${ev.id}`, ev.title)
+  }
+  return map
+})
+
+function getEvalTitle(iri: string | null | undefined): string {
+  if (!iri) return '—'
+  return evalMap.value.get(iri) ?? `#${iri.split('/').pop()}`
+}
+
+function getEvalMaxScore(iri: string | null | undefined): number {
+  if (!iri) return 100
+  const ev = evaluations.value.find((e) => `/api/evaluations/${e.id}` === iri)
+  return parseFloat(ev?.maxScore ?? '100')
+}
 
 onMounted(() => {
   document.title = 'Évaluations — Auxilium'
   fetchEvaluations()
+  loadUsers()
 })
 
-// --- Helpers ---
+// ── Helpers ──
 const EVAL_TYPE_LABELS: Record<string, string> = {
-  quiz: 'Quiz',
+  qcm:        'QCM',
+  text_libre: 'Texte libre',
+  mix:        'Mixte',
+  quiz:       'Quiz',
   assignment: 'Devoir',
-  exam: 'Examen',
-  practical: 'Pratique',
-  project: 'Projet',
+  exam:       'Examen',
+  practical:  'Pratique',
+  project:    'Projet',
 }
 
 function evalTypeLabel(t: string | null | undefined): string {
   return t ? (EVAL_TYPE_LABELS[t] ?? t) : '—'
 }
 
+function evalTypeSeverity(t: string | null | undefined): 'info' | 'warn' | 'secondary' {
+  if (t === 'qcm') return 'info'
+  if (t === 'text_libre') return 'warn'
+  return 'secondary'
+}
+
+const SUBMISSION_STATUS_LABELS: Record<string, string> = {
+  not_started:    'Non commencé',
+  in_progress:    'En cours',
+  submitted:      'Soumis',
+  pending_review: 'À noter',
+  graded:         'Noté',
+  failed:         'Échoué',
+}
+const SUBMISSION_STATUS_SEVERITY: Record<string, 'secondary' | 'warn' | 'info' | 'success' | 'danger'> = {
+  not_started:    'secondary',
+  in_progress:    'warn',
+  submitted:      'info',
+  pending_review: 'warn',
+  graded:         'success',
+  failed:         'danger',
+}
+
+function subLabel(s: string)    { return SUBMISSION_STATUS_LABELS[s] ?? s }
+function subSeverity(s: string) { return SUBMISSION_STATUS_SEVERITY[s] ?? 'secondary' }
+
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('fr-FR')
 }
 
-function extractId(iri: string | null | undefined): string {
-  if (!iri) return '?'
-  return iri.split('/').pop() ?? iri
+// ── Grading Dialog ──
+const showGrade    = ref(false)
+const gradeTarget  = ref<EvaluationSubmissionSubmissionRead | null>(null)
+const gradeScore   = ref<number | null>(null)
+const gradeFeedback = ref('')
+const grading      = ref(false)
+const gradeError   = ref<string | null>(null)
+
+function openGrade(submission: EvaluationSubmissionSubmissionRead) {
+  gradeTarget.value  = submission
+  gradeScore.value   = null
+  gradeFeedback.value = ''
+  gradeError.value   = null
+  showGrade.value    = true
 }
 
-const SUBMISSION_STATUS_LABELS: Record<string, string> = {
-  not_started: 'Non commencé',
-  in_progress: 'En cours',
-  submitted: 'Soumis',
-  graded: 'Noté',
-  failed: 'Échoué',
-}
+const gradeMaxScore = computed(() =>
+  gradeTarget.value ? getEvalMaxScore(gradeTarget.value.evaluation) : 100,
+)
 
-const SUBMISSION_STATUS_SEVERITY: Record<
-  string,
-  'secondary' | 'warn' | 'info' | 'success' | 'danger'
-> = {
-  not_started: 'secondary',
-  in_progress: 'warn',
-  submitted: 'info',
-  graded: 'success',
-  failed: 'danger',
-}
+async function handleGrade() {
+  if (gradeScore.value === null) { gradeError.value = 'La note est obligatoire.'; return }
+  if (gradeScore.value < 0 || gradeScore.value > gradeMaxScore.value) {
+    gradeError.value = `La note doit être entre 0 et ${gradeMaxScore.value}.`
+    return
+  }
+  if (!gradeTarget.value?.id) return
 
-function submissionStatusLabel(s: string): string {
-  return SUBMISSION_STATUS_LABELS[s] ?? s
-}
-function submissionStatusSeverity(
-  s: string,
-): 'secondary' | 'warn' | 'info' | 'success' | 'danger' {
-  return SUBMISSION_STATUS_SEVERITY[s] ?? 'secondary'
+  grading.value = true
+  gradeError.value = null
+  try {
+    await gradeSubmission(
+      gradeTarget.value.id,
+      String(gradeScore.value),
+      gradeFeedback.value.trim(),
+    )
+    showGrade.value = false
+    toast.add({ severity: 'success', summary: 'Note enregistrée', life: 3000 })
+    await fetchEvaluations()
+  } catch {
+    gradeError.value = 'Une erreur est survenue lors de l\'enregistrement.'
+  } finally {
+    grading.value = false
+  }
 }
 </script>
 
 <template>
   <div class="evaluations-page" :aria-busy="loading ? 'true' : undefined">
+    <Toast />
+
     <div class="page-header">
       <h1>Évaluations</h1>
     </div>
 
     <!-- Erreur -->
-    <div v-if="error" role="alert" aria-live="polite" class="error-message">
-      <i class="pi pi-exclamation-triangle" aria-hidden="true" />
-      {{ error }}
+    <div v-if="error" role="alert" aria-live="polite" class="dash-error">
+      <i class="pi pi-exclamation-triangle" aria-hidden="true" /> {{ error }}
     </div>
 
     <!-- Chargement -->
-    <div v-else-if="loading" class="skeleton-list" aria-label="Chargement des évaluations en cours">
-      <Skeleton v-for="i in 6" :key="i" height="2.75rem" class="skeleton-row" />
+    <div v-else-if="loading" class="list-skeleton" aria-label="Chargement des évaluations">
+      <Skeleton v-for="i in 6" :key="i" height="2.75rem" border-radius="10px" />
     </div>
 
-    <!-- Contenu -->
-    <Tabs v-else v-model:value="activeTab">
+    <!-- Contenu avec onglets -->
+    <Tabs v-else v-model:value="activeTab" class="glass-tabs">
       <TabList>
         <Tab value="evaluations" aria-controls="panel-evaluations">
           Toutes les évaluations
         </Tab>
-        <Tab
-          v-if="isFormateur"
-          value="pending"
-          aria-controls="panel-pending"
-        >
+        <Tab v-if="canGrade" value="pending" aria-controls="panel-pending">
           À noter
-          <span v-if="pendingGrading.length > 0" class="badge" aria-label="soumissions en attente">
+          <span v-if="pendingGrading.length > 0" class="tab-badge">
             {{ pendingGrading.length }}
           </span>
         </Tab>
       </TabList>
 
       <TabPanels>
-        <!-- Onglet : liste des évaluations -->
-        <TabPanel value="evaluations" id="panel-evaluations">
+        <!-- ── Onglet : liste des évaluations ── -->
+        <TabPanel id="panel-evaluations" value="evaluations">
           <DataTable
             :value="evaluations"
             paginator
             :rows="20"
             :rows-per-page-options="[10, 20, 50]"
             aria-label="Liste des évaluations"
+            class="glass-table"
           >
             <template #empty>
-              <span class="table-empty">Aucune évaluation trouvée.</span>
+              <div class="empty-state">
+                <i class="pi pi-check-circle" />
+                <p>Aucune évaluation trouvée.</p>
+              </div>
             </template>
 
             <Column field="title" header="Titre" sortable style="min-width: 200px" />
 
-            <Column header="Type" style="width: 120px">
+            <Column header="Type" style="width: 130px">
               <template #body="{ data }">
-                {{ evalTypeLabel(data.evaluationType) }}
+                <Tag
+                  :value="evalTypeLabel(data.evaluationType)"
+                  :severity="evalTypeSeverity(data.evaluationType)"
+                />
               </template>
             </Column>
 
-            <Column header="Note max" style="width: 100px">
-              <template #body="{ data }">
-                {{ data.maxScore }}
-              </template>
+            <Column header="Note max" style="width: 100px; text-align:right">
+              <template #body="{ data }">{{ data.maxScore }}</template>
             </Column>
 
-            <Column header="Note passage" style="width: 120px">
-              <template #body="{ data }">
-                {{ data.passingScore }}
-              </template>
+            <Column header="Seuil réussite" style="width: 120px; text-align:right">
+              <template #body="{ data }">{{ data.passingScore }}</template>
             </Column>
 
-            <Column header="Durée (min)" style="width: 120px">
-              <template #body="{ data }">
-                {{ data.durationMinutes ?? '—' }}
-              </template>
+            <Column header="Durée (min)" style="width: 110px; text-align:right">
+              <template #body="{ data }">{{ data.durationMinutes ?? '—' }}</template>
             </Column>
 
-            <Column header="Publié" style="width: 100px">
+            <Column header="Publié" style="width: 90px">
               <template #body="{ data }">
                 <Tag
                   :value="data.isPublished ? 'Oui' : 'Non'"
@@ -159,7 +249,7 @@ function submissionStatusSeverity(
               </template>
             </Column>
 
-            <Column header="Obligatoire" style="width: 110px">
+            <Column header="Obligatoire" style="width: 105px">
               <template #body="{ data }">
                 <Tag
                   :value="data.isMandatory ? 'Oui' : 'Non'"
@@ -169,67 +259,153 @@ function submissionStatusSeverity(
             </Column>
 
             <Column header="Disponible du" style="width: 130px">
-              <template #body="{ data }">
-                {{ formatDate(data.availableFrom) }}
-              </template>
+              <template #body="{ data }">{{ formatDate(data.availableFrom) }}</template>
             </Column>
           </DataTable>
         </TabPanel>
 
-        <!-- Onglet : à noter (formateurs) -->
-        <TabPanel v-if="isFormateur" value="pending" id="panel-pending">
+        <!-- ── Onglet : À noter ── -->
+        <TabPanel v-if="canGrade" id="panel-pending" value="pending">
           <DataTable
             :value="pendingGrading"
             paginator
             :rows="20"
             aria-label="Soumissions en attente de notation"
+            class="glass-table"
           >
             <template #empty>
-              <span class="table-empty">Aucune soumission en attente de notation.</span>
+              <div class="empty-state">
+                <i class="pi pi-check-circle" style="color: #86efac" />
+                <p>Tout est noté — aucune soumission en attente !</p>
+              </div>
             </template>
 
-            <Column header="Stagiaire" style="width: 110px">
+            <!-- Stagiaire -->
+            <Column header="Stagiaire" style="min-width: 160px">
               <template #body="{ data }">
-                #{{ extractId(data.user) }}
+                <div class="user-cell">
+                  <div class="user-avatar-sm">
+                    {{ getUserName(data.user).split(' ').map((n: string) => n[0]).join('').slice(0, 2) }}
+                  </div>
+                  <span>{{ getUserName(data.user) }}</span>
+                </div>
               </template>
             </Column>
 
+            <!-- Évaluation -->
             <Column header="Évaluation" style="min-width: 180px">
               <template #body="{ data }">
-                #{{ extractId(data.evaluation) }}
+                <span class="eval-title">{{ getEvalTitle(data.evaluation) }}</span>
               </template>
             </Column>
 
-            <Column header="Tentative" style="width: 100px">
-              <template #body="{ data }">
-                {{ data.attemptNumber }}
-              </template>
+            <!-- Tentative -->
+            <Column header="Tentative" style="width: 95px; text-align:right">
+              <template #body="{ data }">{{ data.attemptNumber }}</template>
             </Column>
 
-            <Column header="Note" style="width: 90px">
-              <template #body="{ data }">
-                {{ data.score ?? '—' }}
-              </template>
+            <!-- Note max -->
+            <Column header="Note max" style="width: 95px; text-align:right">
+              <template #body="{ data }">{{ data.maxScore }}</template>
             </Column>
 
+            <!-- Statut -->
             <Column header="Statut" style="width: 110px">
               <template #body="{ data }">
-                <Tag
-                  :value="submissionStatusLabel(data.status)"
-                  :severity="submissionStatusSeverity(data.status)"
-                />
+                <Tag :value="subLabel(data.status)" :severity="subSeverity(data.status)" />
               </template>
             </Column>
 
-            <Column header="Soumis le" style="width: 120px">
+            <!-- Soumis le -->
+            <Column header="Soumis le" style="width: 115px">
+              <template #body="{ data }">{{ formatDate(data.submittedAt) }}</template>
+            </Column>
+
+            <!-- Action -->
+            <Column header="" style="width: 100px">
               <template #body="{ data }">
-                {{ formatDate(data.submittedAt) }}
+                <Button
+                  label="Noter"
+                  icon="pi pi-pencil"
+                  size="small"
+                  @click="openGrade(data)"
+                />
               </template>
             </Column>
           </DataTable>
         </TabPanel>
       </TabPanels>
     </Tabs>
+
+    <!-- ── Dialog notation ── -->
+    <Dialog
+      v-model:visible="showGrade"
+      modal
+      header="Notation manuelle"
+      :style="{ width: '480px', maxWidth: '95vw' }"
+      :draggable="false"
+      class="glass-dialog"
+    >
+      <div v-if="gradeTarget" class="grade-form">
+        <!-- Context -->
+        <div class="grade-context">
+          <div class="grade-context-row">
+            <i class="pi pi-user grade-icon" />
+            <span>{{ getUserName(gradeTarget.user) }}</span>
+          </div>
+          <div class="grade-context-row">
+            <i class="pi pi-check-circle grade-icon" />
+            <span>{{ getEvalTitle(gradeTarget.evaluation) }}</span>
+          </div>
+          <div class="grade-context-row">
+            <i class="pi pi-info-circle grade-icon" />
+            <span>Note max : <strong>{{ gradeMaxScore }}</strong> — Tentative {{ gradeTarget.attemptNumber }}</span>
+          </div>
+        </div>
+
+        <div v-if="gradeError" class="grade-error" role="alert">
+          <i class="pi pi-exclamation-circle" /> {{ gradeError }}
+        </div>
+
+        <!-- Score -->
+        <div class="field">
+          <label for="gd-score">Note obtenue <span class="req">*</span></label>
+          <InputNumber
+            id="gd-score"
+            v-model="gradeScore"
+            :min="0"
+            :max="gradeMaxScore"
+            :invalid="!!gradeError && gradeScore === null"
+            placeholder="0"
+            fluid
+            show-buttons
+          />
+          <small class="field-hint">Entre 0 et {{ gradeMaxScore }}</small>
+        </div>
+
+        <!-- Feedback -->
+        <div class="field">
+          <label for="gd-feedback">Commentaire</label>
+          <Textarea
+            id="gd-feedback"
+            v-model="gradeFeedback"
+            rows="4"
+            placeholder="Retour personnalisé pour le stagiaire…"
+            style="width: 100%"
+          />
+        </div>
+
+        <div class="grade-actions">
+          <Button label="Annuler" severity="secondary" text :disabled="grading" @click="showGrade = false" />
+          <Button
+            label="Enregistrer la note"
+            icon="pi pi-check"
+            :loading="grading"
+            @click="handleGrade"
+          />
+        </div>
+      </div>
+    </Dialog>
   </div>
 </template>
 
@@ -240,50 +416,227 @@ function submissionStatusSeverity(
   gap: 1.25rem;
 }
 
-.page-header h1 {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
+.list-skeleton { display: flex; flex-direction: column; gap: 0.5rem; }
+
+/* Tabs glass */
+.glass-tabs {
+  background: transparent;
 }
 
-.error-message {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.875rem 1rem;
-  border-radius: var(--p-border-radius-md);
-  background: var(--p-red-100);
-  color: var(--p-red-700);
-  font-size: 0.9rem;
+:deep(.p-tablist) {
+  background: rgba(255, 255, 255, 0.45) !important;
+  backdrop-filter: blur(14px) !important;
+  border-radius: 14px 14px 0 0 !important;
+  border-bottom: 1px solid rgba(196, 181, 253, 0.3) !important;
+  padding: 0 0.75rem !important;
 }
 
-.skeleton-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+:deep(.p-tab) {
+  color: #7c6fa0 !important;
+  font-weight: 500 !important;
+  border-radius: 0 !important;
+  border-bottom: 2px solid transparent !important;
+  transition: color 0.15s, border-color 0.15s !important;
+  padding: 0.875rem 1rem !important;
 }
 
-.skeleton-row {
-  border-radius: var(--p-border-radius-md);
+:deep(.p-tab[aria-selected="true"]),
+:deep(.p-tab.p-tab-active) {
+  color: #6d28d9 !important;
+  border-bottom-color: #8b5cf6 !important;
+  font-weight: 600 !important;
 }
 
-.badge {
+:deep(.p-tabpanels) {
+  background: rgba(255, 255, 255, 0.45) !important;
+  backdrop-filter: blur(14px) !important;
+  border-radius: 0 0 14px 14px !important;
+  border: 1px solid rgba(255, 255, 255, 0.55) !important;
+  border-top: none !important;
+  padding: 1.25rem !important;
+}
+
+.tab-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.25rem;
-  height: 1.25rem;
-  border-radius: 9999px;
-  background: var(--p-primary-color);
-  color: white;
-  font-size: 0.7rem;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: #fff;
+  font-size: 0.65rem;
   font-weight: 700;
   margin-left: 0.4rem;
-  padding: 0 0.3rem;
+  padding: 0 5px;
 }
 
-.table-empty {
-  color: var(--p-text-muted-color);
-  font-style: italic;
+/* Table glass */
+.glass-table {
+  background: transparent !important;
+}
+
+:deep(.glass-table .p-datatable-header-cell) {
+  background: rgba(237, 233, 254, 0.5) !important;
+  color: #5b21b6 !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  border-bottom: 1px solid rgba(196, 181, 253, 0.3) !important;
+}
+
+:deep(.glass-table .p-datatable-tbody > tr) {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(196, 181, 253, 0.12) !important;
+  transition: background 0.15s;
+}
+
+:deep(.glass-table .p-datatable-tbody > tr:hover) {
+  background: rgba(167, 139, 250, 0.07) !important;
+}
+
+/* Cells */
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.user-avatar-sm {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #c4b5fd, #93c5fd);
+  color: #4c1d95;
+  font-size: 0.6rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.eval-title {
+  font-weight: 500;
+  color: #1e1b4b;
+}
+
+/* Error / empty */
+.dash-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(254, 202, 202, 0.4);
+  border: 1px solid rgba(252, 165, 165, 0.5);
+  color: #dc2626;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 3rem 1rem;
+  color: #7c6fa0;
+}
+
+.empty-state .pi { font-size: 2rem; opacity: 0.4; }
+.empty-state p { margin: 0; font-size: 0.9rem; }
+
+/* Grading Dialog */
+:deep(.glass-dialog .p-dialog) {
+  background: rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: blur(24px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.65) !important;
+  border-radius: 20px !important;
+}
+
+:deep(.glass-dialog .p-dialog-header) {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(196, 181, 253, 0.2) !important;
+  padding: 1.25rem 1.5rem !important;
+}
+
+:deep(.glass-dialog .p-dialog-title) {
+  font-size: 1.1rem !important;
+  font-weight: 700 !important;
+  color: #4c1d95 !important;
+}
+
+:deep(.glass-dialog .p-dialog-content) {
+  background: transparent !important;
+  padding: 1.5rem !important;
+}
+
+.grade-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.grade-context {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: rgba(237, 233, 254, 0.35);
+  border-radius: 12px;
+  border: 1px solid rgba(196, 181, 253, 0.3);
+}
+
+.grade-context-row {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.grade-icon {
+  color: #8b5cf6;
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.grade-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(254, 202, 202, 0.45);
+  border: 1px solid rgba(252, 165, 165, 0.5);
+  color: #dc2626;
+  border-radius: 10px;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.field label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #5b21b6;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.req { color: #ef4444; margin-left: 2px; }
+.field-hint { color: #7c6fa0; font-size: 0.75rem; }
+
+.grade-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(196, 181, 253, 0.2);
 }
 </style>
