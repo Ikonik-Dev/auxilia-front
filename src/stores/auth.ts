@@ -1,85 +1,70 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
-const TOKEN_KEY = 'auxilia_jwt'
-const REFRESH_KEY = 'auxilia_refresh'
-
-interface JwtPayload {
-  username?: string
-  email?: string
+interface UserProfile {
+  id: number
+  email: string
+  firstName: string
+  lastName: string
   roles: string[]
-  exp: number
-  iat: number
-}
-
-function decodePayload(token: string): JwtPayload | null {
-  try {
-    const part = token.split('.')[1]
-    if (!part) return null
-    const base64 = part.replace(/-/g, '+').replace(/_/g, '/')
-    return JSON.parse(atob(base64)) as JwtPayload
-  } catch {
-    return null
-  }
+  avatar: string | null
+  isActive: boolean
 }
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref<string | null>(localStorage.getItem(TOKEN_KEY))
-  const refreshToken = ref<string | null>(localStorage.getItem(REFRESH_KEY))
+  const user = ref<UserProfile | null>(null)
 
-  const payload = computed<JwtPayload | null>(() =>
-    token.value ? decodePayload(token.value) : null,
-  )
+  const isAuthenticated = computed<boolean>(() => user.value !== null)
 
-  const isAuthenticated = computed<boolean>(() => {
-    if (!token.value || !payload.value) return false
-    return payload.value.exp * 1000 > Date.now()
+  const roles = computed<string[]>(() => user.value?.roles ?? [])
+
+  const userEmail = computed<string>(() => user.value?.email ?? '')
+
+  const userName = computed<string>(() => {
+    if (user.value) return `${user.value.firstName} ${user.value.lastName}`.trim()
+    return userEmail.value
   })
-
-  const roles = computed<string[]>(() => payload.value?.roles ?? [])
-
-  const userEmail = computed<string>(
-    () => payload.value?.username ?? payload.value?.email ?? '',
-  )
 
   function hasRole(role: string): boolean {
     return roles.value.includes(role)
   }
 
+  async function fetchMe(): Promise<void> {
+    try {
+      const response = await fetch('/api/auth/me', {
+        credentials: 'include',
+      })
+      if (response.ok) {
+        user.value = (await response.json()) as UserProfile
+      } else {
+        user.value = null
+      }
+    } catch {
+      user.value = null
+    }
+  }
+
   async function login(email: string, password: string): Promise<void> {
-    const response = await fetch('/api/login_check', {
+    const response = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: email, password }),
+      credentials: 'include',
+      body: JSON.stringify({ email, password }),
     })
     if (!response.ok) {
       throw new Error('Identifiants invalides')
     }
-    const data = (await response.json()) as { token: string; refresh_token?: string }
-    token.value = data.token
-    localStorage.setItem(TOKEN_KEY, data.token)
-    if (data.refresh_token) {
-      refreshToken.value = data.refresh_token
-      localStorage.setItem(REFRESH_KEY, data.refresh_token)
-    }
+    await fetchMe()
   }
 
   async function refresh(): Promise<boolean> {
-    if (!refreshToken.value) return false
     try {
-      const response = await fetch('/api/token/refresh', {
+      const response = await fetch('/api/auth/refresh', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: refreshToken.value }),
+        credentials: 'include',
       })
       if (!response.ok) return false
-      const data = (await response.json()) as { token: string; refresh_token?: string }
-      token.value = data.token
-      localStorage.setItem(TOKEN_KEY, data.token)
-      if (data.refresh_token) {
-        refreshToken.value = data.refresh_token
-        localStorage.setItem(REFRESH_KEY, data.refresh_token)
-      }
+      await fetchMe()
       return true
     } catch {
       return false
@@ -87,11 +72,8 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function logout(): void {
-    token.value = null
-    refreshToken.value = null
-    localStorage.removeItem(TOKEN_KEY)
-    localStorage.removeItem(REFRESH_KEY)
+    user.value = null
   }
 
-  return { token, isAuthenticated, roles, userEmail, hasRole, login, refresh, logout }
+  return { user, isAuthenticated, roles, userEmail, userName, hasRole, login, refresh, logout, fetchMe }
 })
