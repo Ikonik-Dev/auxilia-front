@@ -103,9 +103,10 @@ export function useStatistiques() {
       ])
 
       if (fsRes.error && usRes.error) error.value = 'Impossible de charger les statistiques.'
-      formationStats.value = fsRes.data ?? []
-      userStats.value      = usRes.data ?? []
-      feedbacks.value      = fbRes.data ?? []
+      // Garde contre un objet Hydra retourné au lieu d'un tableau
+      formationStats.value = Array.isArray(fsRes.data) ? fsRes.data : []
+      userStats.value      = Array.isArray(usRes.data) ? usRes.data : []
+      feedbacks.value      = Array.isArray(fbRes.data) ? fbRes.data : []
 
       const fMap = new Map<string, string>()
       for (const f of fmRes.data ?? []) if (f.id) fMap.set(`/api/formations/${f.id}`, f.title)

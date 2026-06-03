@@ -315,6 +315,7 @@ async function handleUpload() {
               ref="fileInputRef"
               type="file"
               class="file-input"
+              aria-label="Sélectionner un fichier à uploader"
               @change="onFileChange"
             />
             <div v-if="!uploadFile" class="file-drop-hint">

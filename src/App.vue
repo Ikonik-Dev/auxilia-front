@@ -78,6 +78,30 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover { background: rgba(139, 92, 246, 0.45); }
 
+/* ── Accessibilité — focus visible global ── */
+:focus-visible {
+  outline: 2.5px solid #8b5cf6;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* PrimeVue inputs/selects : renforcer l'outline (leurs règles :focus-visible passent après) */
+.p-inputtext:focus-visible,
+.p-select:focus-visible,
+.p-checkbox .p-checkbox-box:focus-visible,
+.p-datatable .p-datatable-tbody > tr:focus-visible {
+  outline: 2.5px solid #8b5cf6 !important;
+  outline-offset: 3px !important;
+}
+
+/* Boutons PrimeVue : double anneau — blanc pour gap, violet foncé pour contraste sur fond clair */
+.p-button:focus-visible {
+  outline: none !important;
+  box-shadow:
+    0 0 0 3px #fff,
+    0 0 0 6px #4c1d95 !important;
+}
+
 /* ── PrimeVue global glass overrides ── */
 
 /* Card */
@@ -131,7 +155,7 @@ body {
 .p-button:not(.p-button-secondary):not(.p-button-success):not(.p-button-warning):not(.p-button-danger):not(.p-button-info):not(.p-button-help):not(.p-button-text):not(.p-button-outlined):not(.p-button-link) {
   background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%) !important;
   border-color: transparent !important;
-  box-shadow: 0 4px 18px rgba(139, 92, 246, 0.32) !important;
+  box-shadow: 0 4px 18px rgba(139, 92, 246, 0.32);
   border-radius: 12px !important;
   font-weight: 600 !important;
   transition: all 0.2s ease !important;
@@ -140,7 +164,7 @@ body {
 .p-button.p-button-primary:hover,
 .p-button:not(.p-button-secondary):not(.p-button-success):not(.p-button-warning):not(.p-button-danger):not(.p-button-info):not(.p-button-help):not(.p-button-text):not(.p-button-outlined):not(.p-button-link):hover {
   background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%) !important;
-  box-shadow: 0 8px 28px rgba(139, 92, 246, 0.42) !important;
+  box-shadow: 0 8px 28px rgba(139, 92, 246, 0.42);
   transform: translateY(-1px) !important;
 }
 

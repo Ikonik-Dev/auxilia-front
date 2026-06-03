@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import NotificationsPanel from '@/components/layout/NotificationsPanel.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 
 interface NavItem {
   label: string
@@ -44,7 +45,7 @@ async function handleLogout() {
   <div class="app-layout">
 
     <!-- ── Sidebar ── -->
-    <aside class="sidebar">
+    <aside class="sidebar" aria-label="Navigation">
       <!-- Logo + cloche notifications -->
       <div class="sidebar-header">
         <div class="sidebar-logo-mark">
@@ -55,13 +56,14 @@ async function handleLogout() {
       </div>
 
       <!-- Navigation -->
-      <nav class="sidebar-nav" aria-label="Navigation principale">
+      <nav class="sidebar-nav" role="navigation" aria-label="Navigation principale">
         <RouterLink
           v-for="item in navItems"
           :key="item.to"
           :to="item.to"
           class="nav-item"
           active-class="nav-item--active"
+          :aria-current="route.path === item.to || route.path.startsWith(item.to + '/') ? 'page' : undefined"
         >
           <span class="nav-icon-wrap">
             <i :class="item.icon" />
@@ -310,4 +312,5 @@ async function handleLogout() {
   overflow: auto;
   min-width: 0;
 }
+
 </style>

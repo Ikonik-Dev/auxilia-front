@@ -27,15 +27,21 @@ export const router = createRouter({
       children: [
         { path: '', redirect: '/dashboard' },
 
-        // Tableau de bord (groupe sans composant propre — enfants rendus dans
-        // le RouterView d'AppLayout directement)
+        // Tableau de bord — la redirection role-aware est dans le router
+        // pour éviter une double navigation (composant qui appelle router.replace)
         {
           path: 'dashboard',
           children: [
             {
               path: '',
               name: 'dashboard',
-              component: () => import('@/pages/dashboard/index.vue'),
+              redirect: () => {
+                const auth = useAuthStore()
+                if (auth.hasRole('ROLE_ADMIN') || auth.hasRole('ROLE_DIRECTEUR')) return '/dashboard/directeur'
+                if (auth.hasRole('ROLE_FORMATEUR')) return '/dashboard/formateur'
+                if (auth.hasRole('ROLE_RESPONSABLE_PED')) return '/dashboard/responsable'
+                return '/dashboard/stagiaire'
+              },
             },
             {
               path: 'directeur',
@@ -135,6 +141,18 @@ export const router = createRouter({
     },
     { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
   ],
+})
+
+// Si un composant lazy échoue à charger (réseau, bug JS), on force un rechargement
+// pour éviter que le router reste bloqué "pending" et bloque toutes les navigations suivantes.
+router.onError((error, to) => {
+  const isChunkError =
+    error.message?.includes('Failed to fetch dynamically imported module') ||
+    error.message?.includes('Importing a module script failed') ||
+    error.name === 'ChunkLoadError'
+  if (isChunkError) {
+    window.location.href = to.fullPath
+  }
 })
 
 router.beforeEach(async (to) => {

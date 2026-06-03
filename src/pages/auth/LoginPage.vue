@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, nextTick, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import AuthLayout from '@/layouts/AuthLayout.vue'
@@ -14,6 +14,11 @@ const email = ref('')
 const password = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
+const emailInputRef = ref<HTMLInputElement | null>(null)
+
+onMounted(() => {
+  document.title = 'Connexion — Auxilium'
+})
 
 async function handleLogin() {
   if (!email.value || !password.value) return
@@ -24,6 +29,8 @@ async function handleLogin() {
     await router.push({ name: 'dashboard' })
   } catch {
     errorMessage.value = 'Email ou mot de passe incorrect.'
+    await nextTick()
+    emailInputRef.value?.focus()
   } finally {
     loading.value = false
   }
@@ -44,8 +51,14 @@ async function handleLogin() {
 
       <form class="login-form" @submit.prevent="handleLogin">
         <!-- Error banner -->
-        <div v-if="errorMessage" class="error-banner">
-          <i class="pi pi-exclamation-circle" />
+        <div
+          v-if="errorMessage"
+          id="login-error"
+          class="error-banner"
+          role="alert"
+          aria-live="polite"
+        >
+          <i class="pi pi-exclamation-circle" aria-hidden="true" />
           {{ errorMessage }}
         </div>
 
@@ -54,11 +67,13 @@ async function handleLogin() {
           <label for="email">Adresse email</label>
           <InputText
             id="email"
+            ref="emailInputRef"
             v-model="email"
             type="email"
             placeholder="votre@email.com"
             autocomplete="username"
             :disabled="loading"
+            :aria-describedby="errorMessage ? 'login-error' : undefined"
             fluid
           />
         </div>
@@ -73,6 +88,7 @@ async function handleLogin() {
             autocomplete="current-password"
             :disabled="loading"
             placeholder="••••••••"
+            :aria-describedby="errorMessage ? 'login-error' : undefined"
             fluid
           />
         </div>
@@ -84,6 +100,7 @@ async function handleLogin() {
           icon="pi pi-arrow-right"
           icon-pos="right"
           :loading="loading"
+          :aria-busy="loading"
           class="submit-btn"
           fluid
         />
@@ -197,7 +214,7 @@ async function handleLogin() {
   padding: 0.85rem 1.5rem !important;
   font-weight: 600 !important;
   font-size: 0.9375rem !important;
-  box-shadow: 0 4px 22px rgba(139, 92, 246, 0.38) !important;
+  box-shadow: 0 4px 22px rgba(139, 92, 246, 0.38);
   transition: all 0.22s ease !important;
   margin-top: 0.25rem;
 }
@@ -205,7 +222,7 @@ async function handleLogin() {
 :deep(.submit-btn.p-button:hover:not(:disabled)) {
   background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%) !important;
   transform: translateY(-2px) !important;
-  box-shadow: 0 8px 30px rgba(139, 92, 246, 0.48) !important;
+  box-shadow: 0 8px 30px rgba(139, 92, 246, 0.48);
 }
 
 :deep(.submit-btn.p-button:active) {

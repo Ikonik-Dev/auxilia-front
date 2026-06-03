@@ -40,9 +40,12 @@ onMounted(() => {
 })
 
 // ── Filtre de période ──
-const dateRange = ref<[Date | null, Date | null]>([null, null])
+// PrimeVue DatePicker (range) plante si le v-model contient [null, null] →
+// on utilise null pour "pas de sélection" et un tableau de Date pour la sélection.
+const dateRange = ref<Date[] | null>(null)
 
 const filteredFormationStats = computed(() => {
+  if (!dateRange.value) return formationStats.value
   const [from, to] = dateRange.value
   if (!from && !to) return formationStats.value
   return formationStats.value.filter((s) => {
@@ -234,14 +237,14 @@ function exportUsers() {
           class="period-picker"
         />
         <Button
-          v-if="dateRange[0] || dateRange[1]"
+          v-if="dateRange"
           icon="pi pi-times"
           text
           rounded
           severity="secondary"
           size="small"
           aria-label="Effacer le filtre"
-          @click="dateRange = [null, null]"
+          @click="dateRange = null"
         />
       </div>
 

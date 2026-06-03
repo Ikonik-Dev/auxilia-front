@@ -30,9 +30,12 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function fetchMe(): Promise<void> {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 3000)
     try {
       const response = await fetch('/api/auth/me', {
         credentials: 'include',
+        signal: ctrl.signal,
       })
       if (response.ok) {
         user.value = (await response.json()) as UserProfile
@@ -41,6 +44,8 @@ export const useAuthStore = defineStore('auth', () => {
       }
     } catch {
       user.value = null
+    } finally {
+      clearTimeout(timer)
     }
   }
 
@@ -58,16 +63,21 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function refresh(): Promise<boolean> {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 3000)
     try {
       const response = await fetch('/api/auth/refresh', {
         method: 'POST',
         credentials: 'include',
+        signal: ctrl.signal,
       })
       if (!response.ok) return false
       await fetchMe()
       return true
     } catch {
       return false
+    } finally {
+      clearTimeout(timer)
     }
   }
 
