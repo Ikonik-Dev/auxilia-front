@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { useParcours } from '@/composables/useParcours'
 import type { LessonRow } from '@/composables/useParcours'
@@ -349,7 +349,7 @@ const STATUS_LABELS: Record<string, string> = {
   gap: 0.75rem;
   padding: 4rem 2rem;
   text-align: center;
-  color: #7c6fa0;
+  color: #675c9c;
 }
 .empty-hero h2 { margin: 0; font-size: 1.25rem; font-weight: 700; color: #4c1d95; }
 .empty-hero p  { margin: 0; font-size: 0.9rem; }
@@ -404,7 +404,7 @@ const STATUS_LABELS: Record<string, string> = {
   display: flex;
   justify-content: space-between;
   font-size: 0.8rem;
-  color: #7c6fa0;
+  color: #675c9c;
   flex-wrap: wrap;
   gap: 0.5rem;
 }
@@ -422,7 +422,7 @@ const STATUS_LABELS: Record<string, string> = {
   display: flex;
   justify-content: space-between;
   font-size: 0.8rem;
-  color: #7c6fa0;
+  color: #675c9c;
 }
 
 .hero-progress {
@@ -446,7 +446,7 @@ const STATUS_LABELS: Record<string, string> = {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #7c6fa0;
+  color: #675c9c;
   margin: 0 0 0.875rem;
 }
 
@@ -500,7 +500,7 @@ const STATUS_LABELS: Record<string, string> = {
   text-overflow: ellipsis;
 }
 
-.module-count { font-size: 0.72rem; color: #9ca3af; }
+.module-count { font-size: 0.72rem; color: #6b7280; }
 
 .module-progress-mini { display: flex; align-items: center; gap: 0.5rem; width: 120px; }
 .module-progress-bar  { flex: 1; height: 6px !important; }
@@ -532,7 +532,7 @@ const STATUS_LABELS: Record<string, string> = {
   gap: 0.375rem;
   padding: 0.75rem 1.5rem;
   font-size: 0.8125rem;
-  color: #9ca3af;
+  color: #6b7280;
 }
 
 .lesson-row {
@@ -584,7 +584,7 @@ const STATUS_LABELS: Record<string, string> = {
 .lesson-meta { display: flex; gap: 0.5rem; }
 .lesson-type, .lesson-duration {
   font-size: 0.7rem;
-  color: #9ca3af;
+  color: #6b7280;
   background: rgba(0,0,0,0.04);
   padding: 1px 6px;
   border-radius: 6px;
@@ -619,7 +619,7 @@ const STATUS_LABELS: Record<string, string> = {
   align-items: center;
   gap: 0.5rem;
   padding: 1.5rem;
-  color: #7c6fa0;
+  color: #675c9c;
   font-size: 0.9rem;
   background: rgba(237, 233, 254, 0.3);
   border-radius: 14px;
@@ -663,7 +663,7 @@ const STATUS_LABELS: Record<string, string> = {
   gap: 0.5rem;
   background: rgba(254, 202, 202, 0.4);
   border: 1px solid rgba(252, 165, 165, 0.5);
-  color: #dc2626;
+  color: #b91c1c;
   border-radius: 12px;
   padding: 0.75rem 1rem;
   font-size: 0.875rem;
@@ -675,7 +675,7 @@ const STATUS_LABELS: Record<string, string> = {
   align-items: center;
   gap: 0.5rem;
   padding: 3rem 1rem;
-  color: #7c6fa0;
+  color: #675c9c;
 }
 .empty-state .pi { font-size: 2rem; opacity: 0.4; }
 .empty-state p   { margin: 0; font-size: 0.9rem; }

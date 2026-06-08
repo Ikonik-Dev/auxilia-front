@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <RouterView />
 </template>
 
@@ -44,7 +44,7 @@
   /* Text */
   --text-primary:  #1e1b4b;
   --text-muted:    #6b7280;
-  --text-subtle:   #9ca3af;
+  --text-subtle:   #6b7280;
 }
 
 *,
@@ -125,7 +125,7 @@ body {
   font-weight: 600 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.06em !important;
-  color: #7c6fa0 !important;
+  color: #675c9c !important;
 }
 
 /* InputText glass */

@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useAssiduite } from '@/composables/useAssiduite'
 import type { Participant } from '@/composables/useAssiduite'
@@ -429,7 +429,7 @@ const stats = computed(() => {
   align-items: center;
   gap: 0.5rem;
   padding: 3rem 1rem;
-  color: #7c6fa0;
+  color: #675c9c;
   font-size: 0.875rem;
 }
 
@@ -487,7 +487,7 @@ const stats = computed(() => {
 
 .schedule-mandatory {
   font-size: 0.65rem;
-  color: #ef4444;
+  color: #b91c1c;
   background: rgba(252, 165, 165, 0.2);
   padding: 1px 6px;
   border-radius: 6px;
@@ -503,12 +503,12 @@ const stats = computed(() => {
 
 .schedule-meta {
   font-size: 0.72rem;
-  color: #7c6fa0;
+  color: #675c9c;
 }
 
 .schedule-location {
   font-size: 0.7rem;
-  color: #9ca3af;
+  color: #6b7280;
   margin-top: 0.2rem;
 }
 
@@ -533,7 +533,7 @@ const stats = computed(() => {
   align-items: center;
   justify-content: center;
   flex: 1;
-  color: #7c6fa0;
+  color: #675c9c;
   text-align: center;
   gap: 1rem;
 }
@@ -558,7 +558,7 @@ const stats = computed(() => {
 
 .attendance-subtitle {
   font-size: 0.8rem;
-  color: #7c6fa0;
+  color: #675c9c;
   margin: 0;
 }
 
@@ -588,7 +588,7 @@ const stats = computed(() => {
 .stat-chip .pi { font-size: 0.7rem; }
 
 .stat-chip--success  { background: rgba(134, 239, 172, 0.25); color: #15803d; }
-.stat-chip--danger   { background: rgba(252, 165, 165, 0.25); color: #dc2626; }
+.stat-chip--danger   { background: rgba(252, 165, 165, 0.25); color: #b91c1c; }
 .stat-chip--warn     { background: rgba(253, 230, 138, 0.3);  color: #b45309; }
 .stat-chip--secondary{ background: rgba(196, 181, 253, 0.2);  color: #6d28d9; }
 .stat-chip--none     { background: rgba(0,0,0,0.05); color: #6b7280; }
@@ -664,7 +664,7 @@ const stats = computed(() => {
   align-items: center;
   gap: 0.375rem;
   font-size: 0.8125rem;
-  color: #7c6fa0;
+  color: #675c9c;
 }
 
 .save-hint .pi { color: #8b5cf6; }
@@ -676,7 +676,7 @@ const stats = computed(() => {
   gap: 0.5rem;
   background: rgba(254, 202, 202, 0.4);
   border: 1px solid rgba(252, 165, 165, 0.5);
-  color: #dc2626;
+  color: #b91c1c;
   border-radius: 12px;
   padding: 0.75rem 1rem;
   font-size: 0.875rem;
@@ -688,11 +688,11 @@ const stats = computed(() => {
   align-items: center;
   gap: 0.5rem;
   padding: 2rem 1rem;
-  color: #7c6fa0;
+  color: #675c9c;
 }
 
 .empty-state .pi { font-size: 1.5rem; opacity: 0.4; }
 .empty-state p { margin: 0; font-size: 0.875rem; }
 
-.muted { color: #9ca3af; font-style: italic; font-size: 0.85rem; }
+.muted { color: #6b7280; font-style: italic; font-size: 0.85rem; }
 </style>

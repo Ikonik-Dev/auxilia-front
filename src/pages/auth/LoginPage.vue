@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, nextTick, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -27,8 +27,11 @@ async function handleLogin() {
   try {
     await auth.login(email.value, password.value)
     await router.push({ name: 'dashboard' })
-  } catch {
-    errorMessage.value = 'Email ou mot de passe incorrect.'
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : ''
+    errorMessage.value = msg === 'Session invalide après connexion'
+      ? 'Connexion établie mais impossible de charger le profil. Veuillez réessayer.'
+      : 'Email ou mot de passe incorrect.'
     await nextTick()
     emailInputRef.value?.focus()
   } finally {
@@ -165,7 +168,7 @@ async function handleLogin() {
 }
 
 .login-subtitle {
-  color: #7c6fa0;
+  color: #675c9c;
   font-size: 0.875rem;
   margin: 0;
   font-weight: 400;
@@ -185,7 +188,7 @@ async function handleLogin() {
   background: rgba(254, 202, 202, 0.45);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(252, 165, 165, 0.5);
-  color: #dc2626;
+  color: #b91c1c;
   border-radius: 12px;
   padding: 0.75rem 1rem;
   font-size: 0.875rem;

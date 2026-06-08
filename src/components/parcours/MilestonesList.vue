@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import type { MilestoneMilestoneRead } from '@/api'
 
 defineProps<{ milestones: MilestoneMilestoneRead[] }>()
@@ -69,7 +69,7 @@ function isLate(milestone: MilestoneMilestoneRead): boolean {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #9ca3af;
+  color: #6b7280;
   font-size: 0.875rem;
   padding: 1rem 0;
 }
@@ -108,7 +108,7 @@ function isLate(milestone: MilestoneMilestoneRead): boolean {
   align-items: center;
   justify-content: center;
   font-size: 0.65rem;
-  color: #7c6fa0;
+  color: #675c9c;
   z-index: 1;
   transition: all 0.2s;
 }
@@ -166,7 +166,7 @@ function isLate(milestone: MilestoneMilestoneRead): boolean {
 }
 
 .status--done    { background: rgba(134, 239, 172, 0.25); color: #15803d; }
-.status--late    { background: rgba(252, 165, 165, 0.25); color: #dc2626; }
+.status--late    { background: rgba(252, 165, 165, 0.25); color: #b91c1c; }
 .status--pending { background: rgba(196, 181, 253, 0.25); color: #6d28d9; }
 
 .milestone-dates {
@@ -174,7 +174,7 @@ function isLate(milestone: MilestoneMilestoneRead): boolean {
   flex-wrap: wrap;
   gap: 0.75rem;
   font-size: 0.75rem;
-  color: #7c6fa0;
+  color: #675c9c;
 }
 
 .milestone-dates .pi { font-size: 0.65rem; }

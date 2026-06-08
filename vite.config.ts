@@ -17,6 +17,9 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
+        // Réécrit le domaine dans Set-Cookie pour que le navigateur
+        // accepte les cookies proxiés comme venant de localhost:5173
+        cookieDomainRewrite: 'localhost',
       },
     },
   },

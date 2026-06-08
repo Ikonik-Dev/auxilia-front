@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUtilisateurs } from '@/composables/useUtilisateurs'
@@ -408,7 +408,7 @@ async function handleDelete() {
   gap: 0.5rem;
   background: rgba(254, 202, 202, 0.4);
   border: 1px solid rgba(252, 165, 165, 0.5);
-  color: #dc2626;
+  color: #b91c1c;
   border-radius: 12px;
   padding: 0.75rem 1rem;
   font-size: 0.875rem;
@@ -420,7 +420,7 @@ async function handleDelete() {
   align-items: center;
   gap: 0.5rem;
   padding: 3rem 1rem;
-  color: #7c6fa0;
+  color: #675c9c;
 }
 
 .empty-state .pi { font-size: 2rem; opacity: 0.4; }

@@ -1,10 +1,12 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { apiDashboardresponsablePedaGet } from '@/api'
 import Card from 'primevue/card'
 import Tag from 'primevue/tag'
 import Skeleton from 'primevue/skeleton'
 import Rating from 'primevue/rating'
+import Button from 'primevue/button'
+import { useRouter } from 'vue-router'
 
 interface Kpis {
   totalEnrollments: number
@@ -35,11 +37,13 @@ interface ResponsableData {
   recentFeedbacks: RecentFeedback[]
 }
 
+const router = useRouter()
 const data = ref<ResponsableData | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 
 onMounted(async () => {
+  document.title = 'Tableau de bord — Auxilium'
   const { data: raw, error: apiError } = await apiDashboardresponsablePedaGet()
   if (apiError) {
     error.value = 'Impossible de charger le tableau de bord.'
@@ -61,52 +65,71 @@ function fmtDate(iso: string): string {
 </script>
 
 <template>
-  <div>
+  <div :aria-busy="loading">
     <div class="page-header">
-      <h2>Tableau de bord</h2>
+      <h1>Tableau de bord</h1>
       <Tag value="Responsable pédagogique" severity="warn" />
     </div>
 
-    <div v-if="error" class="dash-error">
+    <div v-if="error" role="alert" aria-live="assertive" class="dash-error">
       <i class="pi pi-exclamation-triangle" /> {{ error }}
     </div>
 
     <!-- KPI cards -->
     <div class="stats-grid">
       <template v-if="loading">
-        <Card v-for="n in 4" :key="n">
-          <template #title><Skeleton width="60%" height="0.8rem" /></template>
-          <template #content><Skeleton width="40%" height="2rem" class="mt-2" /></template>
+        <Card v-for="n in 5" :key="n" class="kpi-card">
+          <template #content>
+            <Skeleton width="40%" height="2rem" class="mb-2" />
+            <Skeleton width="60%" height="0.8rem" />
+          </template>
         </Card>
       </template>
 
       <template v-else-if="data">
-        <Card>
-          <template #title>Inscriptions totales</template>
+        <Card class="kpi-card">
           <template #content>
-            <span class="stat-value">{{ data.kpis.totalEnrollments ?? '—' }}</span>
-            <p class="stat-sub">ce mois</p>
+            <div class="kpi-inner">
+              <i class="pi pi-users kpi-icon" aria-hidden="true" />
+              <span class="stat-value">{{ data.kpis.totalEnrollments ?? '—' }}</span>
+              <span class="stat-sub">Inscriptions ce mois</span>
+            </div>
           </template>
         </Card>
-        <Card>
-          <template #title>Actives</template>
+        <Card class="kpi-card">
           <template #content>
-            <span class="stat-value">{{ data.kpis.activeEnrollments ?? '—' }}</span>
-            <p class="stat-sub">en cours</p>
+            <div class="kpi-inner">
+              <i class="pi pi-spinner kpi-icon" aria-hidden="true" />
+              <span class="stat-value">{{ data.kpis.activeEnrollments ?? '—' }}</span>
+              <span class="stat-sub">Actives</span>
+            </div>
           </template>
         </Card>
-        <Card>
-          <template #title>Complétées</template>
+        <Card class="kpi-card">
           <template #content>
-            <span class="stat-value">{{ data.kpis.completedEnrollments ?? '—' }}</span>
-            <p class="stat-sub">certifiées</p>
+            <div class="kpi-inner">
+              <i class="pi pi-verified kpi-icon" aria-hidden="true" />
+              <span class="stat-value">{{ data.kpis.completedEnrollments ?? '—' }}</span>
+              <span class="stat-sub">Complétées</span>
+            </div>
           </template>
         </Card>
-        <Card>
-          <template #title>Taux moyen</template>
+        <Card class="kpi-card">
           <template #content>
-            <span class="stat-value">{{ fmt(data.kpis.avgCompletionRate, ' %') }}</span>
-            <p class="stat-sub">complétion</p>
+            <div class="kpi-inner">
+              <i class="pi pi-chart-line kpi-icon" aria-hidden="true" />
+              <span class="stat-value">{{ fmt(data.kpis.avgCompletionRate, ' %') }}</span>
+              <span class="stat-sub">Taux de complétion</span>
+            </div>
+          </template>
+        </Card>
+        <Card class="kpi-card">
+          <template #content>
+            <div class="kpi-inner">
+              <i class="pi pi-star kpi-icon" aria-hidden="true" />
+              <span class="stat-value">{{ fmt(data.kpis.avgGrade) }}</span>
+              <span class="stat-sub">Moyenne générale</span>
+            </div>
           </template>
         </Card>
       </template>
@@ -114,12 +137,24 @@ function fmtDate(iso: string): string {
 
     <!-- Inscriptions en attente -->
     <div class="section-block">
-      <h3 class="section-title">
-        Inscriptions en attente de validation
-        <span v-if="!loading && (data?.pendingEnrollments?.length ?? 0) > 0" class="badge-count">
-          {{ data!.pendingEnrollments.length }}
-        </span>
-      </h3>
+      <div class="section-header-row">
+        <h3 class="section-title">
+          Inscriptions en attente de validation
+          <span v-if="!loading && (data?.pendingEnrollments?.length ?? 0) > 0" class="badge-count">
+            {{ data!.pendingEnrollments.length }}
+          </span>
+        </h3>
+        <Button
+          v-if="!loading && (data?.pendingEnrollments?.length ?? 0) > 0"
+          label="Voir toutes les inscriptions"
+          icon="pi pi-arrow-right"
+          icon-pos="right"
+          size="small"
+          severity="secondary"
+          text
+          @click="router.push('/inscriptions')"
+        />
+      </div>
 
       <div v-if="loading" class="list-skeleton">
         <Skeleton v-for="n in 3" :key="n" height="3.5rem" class="mb-2" border-radius="12px" />
@@ -127,7 +162,7 @@ function fmtDate(iso: string): string {
 
       <div v-else-if="data?.pendingEnrollments?.length" class="pending-list">
         <div v-for="enrollment in data.pendingEnrollments" :key="enrollment.id" class="pending-item">
-          <div class="pending-avatar">
+          <div class="pending-avatar" aria-hidden="true">
             <i class="pi pi-user" />
           </div>
           <div class="pending-info">
@@ -167,6 +202,7 @@ function fmtDate(iso: string): string {
             readonly
             :cancel="false"
             class="feedback-rating"
+            :aria-label="`Note : ${fb.overallRating ?? 0} sur 5`"
           />
           <p v-if="fb.comment" class="feedback-comment">{{ fb.comment }}</p>
         </div>
@@ -181,14 +217,61 @@ function fmtDate(iso: string): string {
 </template>
 
 <style scoped>
+/* KPI grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.kpi-card :deep(.p-card-body) {
+  padding: 1rem !important;
+}
+
+.kpi-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  text-align: center;
+}
+
+.kpi-icon {
+  font-size: 1.5rem;
+  background: linear-gradient(135deg, #a78bfa, #818cf8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.25rem;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
 .stat-sub {
   font-size: 0.75rem;
-  color: #7c6fa0;
+  color: #675c9c;
   margin: 0.25rem 0 0;
 }
 
+/* Section layout */
 .section-block {
   margin-top: 2rem;
+}
+
+.section-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
 }
 
 .section-title {
@@ -201,6 +284,10 @@ function fmtDate(iso: string): string {
   gap: 0.5rem;
 }
 
+.section-header-row .section-title {
+  margin-bottom: 0;
+}
+
 .badge-count {
   display: inline-flex;
   align-items: center;
@@ -208,7 +295,7 @@ function fmtDate(iso: string): string {
   min-width: 22px;
   height: 22px;
   padding: 0 6px;
-  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  background: #b91c1c;
   color: #fff;
   border-radius: 11px;
   font-size: 0.7rem;
@@ -218,7 +305,8 @@ function fmtDate(iso: string): string {
 .list-skeleton { display: flex; flex-direction: column; }
 
 /* Pending items */
-.pending-list, .feedback-list {
+.pending-list,
+.feedback-list {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -269,7 +357,7 @@ function fmtDate(iso: string): string {
 
 .pending-formation {
   font-size: 0.75rem;
-  color: #7c6fa0;
+  color: #675c9c;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -285,7 +373,7 @@ function fmtDate(iso: string): string {
 
 .pending-date {
   font-size: 0.7rem;
-  color: #9ca3af;
+  color: #6b7280;
 }
 
 /* Feedback items */
@@ -312,7 +400,7 @@ function fmtDate(iso: string): string {
 
 .feedback-date {
   font-size: 0.7rem;
-  color: #9ca3af;
+  color: #6b7280;
 }
 
 .feedback-rating {
@@ -331,26 +419,28 @@ function fmtDate(iso: string): string {
   font-style: italic;
 }
 
+/* Error */
 .dash-error {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   background: rgba(254, 202, 202, 0.4);
   border: 1px solid rgba(252, 165, 165, 0.5);
-  color: #dc2626;
+  color: #b91c1c;
   border-radius: 12px;
   padding: 0.75rem 1rem;
   margin-bottom: 1.5rem;
   font-size: 0.875rem;
 }
 
+/* Empty state */
 .empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.5rem;
   padding: 3rem 1rem;
-  color: #7c6fa0;
+  color: #675c9c;
   background: rgba(255, 255, 255, 0.35);
   border-radius: 16px;
   border: 1px dashed rgba(196, 181, 253, 0.5);

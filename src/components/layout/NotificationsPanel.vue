@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotifications } from '@/composables/useNotifications'
@@ -29,7 +29,7 @@ const TYPE_CONFIG: Record<string, { icon: string; color: string }> = {
 }
 
 function typeConfig(type: string) {
-  return TYPE_CONFIG[type] ?? { icon: 'pi-bell', color: '#7c6fa0' }
+  return TYPE_CONFIG[type] ?? { icon: 'pi-bell', color: '#675c9c' }
 }
 
 // Relative time
@@ -176,7 +176,7 @@ async function handleClick(n: NotificationNotificationRead) {
   height: 18px;
   padding: 0 4px;
   border-radius: 9px;
-  background: linear-gradient(135deg, #ef4444, #f97316);
+  background: #b91c1c;
   color: #fff;
   font-size: 0.6rem;
   font-weight: 700;
@@ -237,7 +237,7 @@ async function handleClick(n: NotificationNotificationRead) {
   align-items: center;
   gap: 0.5rem;
   padding: 2.5rem 1rem;
-  color: #9ca3af;
+  color: #6b7280;
   font-size: 0.875rem;
 }
 
@@ -298,7 +298,7 @@ async function handleClick(n: NotificationNotificationRead) {
 
 .notif-time {
   font-size: 0.68rem;
-  color: #9ca3af;
+  color: #6b7280;
 }
 
 /* Unread dot */

@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -36,7 +36,7 @@ const navItems = computed<NavItem[]>(() =>
 )
 
 async function handleLogout() {
-  auth.logout()
+  await auth.logout()
   await router.push({ name: 'login' })
 }
 </script>
@@ -267,7 +267,7 @@ async function handleLogout() {
 
 .user-status {
   font-size: 0.7rem;
-  color: #7c6fa0;
+  color: #675c9c;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -291,7 +291,7 @@ async function handleLogout() {
   border: none;
   border-radius: 12px;
   background: transparent;
-  color: #7c6fa0;
+  color: #675c9c;
   font-size: 0.8125rem;
   font-weight: 500;
   font-family: inherit;
@@ -302,7 +302,7 @@ async function handleLogout() {
 
 .logout-btn:hover {
   background: rgba(252, 165, 165, 0.18);
-  color: #dc2626;
+  color: #b91c1c;
 }
 
 /* ── Main content ── */

@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, watch } from 'vue'
 import type { UserUserRead } from '@/api'
 import type { UserFormPayload } from '@/composables/useUtilisateurs'
@@ -183,7 +183,7 @@ function handleSubmit() {
   gap: 0.5rem;
   background: rgba(254, 202, 202, 0.45);
   border: 1px solid rgba(252, 165, 165, 0.5);
-  color: #dc2626;
+  color: #b91c1c;
   border-radius: 12px;
   padding: 0.75rem 1rem;
   font-size: 0.875rem;
@@ -222,9 +222,9 @@ function handleSubmit() {
   text-transform: uppercase;
 }
 
-.req { color: #ef4444; margin-left: 2px; }
-.optional { color: #9ca3af; font-weight: 400; text-transform: none; letter-spacing: 0; }
-.field-error { color: #dc2626; font-size: 0.75rem; }
+.req { color: #b91c1c; margin-left: 2px; }
+.optional { color: #6b7280; font-weight: 400; text-transform: none; letter-spacing: 0; }
+.field-error { color: #b91c1c; font-size: 0.75rem; }
 
 .form-actions {
   display: flex;

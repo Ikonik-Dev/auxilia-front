@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useDocuments } from '@/composables/useDocuments'
@@ -382,18 +382,18 @@ async function handleUpload() {
 .file-icon-wrap { font-size: 1.25rem; flex-shrink: 0; }
 .file-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .file-title { font-size: 0.875rem; font-weight: 600; color: #1e1b4b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.file-desc  { font-size: 0.72rem; color: #7c6fa0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-desc  { font-size: 0.72rem; color: #675c9c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Error / empty */
 .dash-error {
   display: flex; align-items: center; gap: 0.5rem;
   background: rgba(254, 202, 202, 0.4);
   border: 1px solid rgba(252, 165, 165, 0.5);
-  color: #dc2626; border-radius: 12px; padding: 0.75rem 1rem; font-size: 0.875rem;
+  color: #b91c1c; border-radius: 12px; padding: 0.75rem 1rem; font-size: 0.875rem;
 }
 
 .empty-state {
-  display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 3rem 1rem; color: #7c6fa0;
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 3rem 1rem; color: #675c9c;
 }
 .empty-state .pi { font-size: 2rem; opacity: 0.4; }
 .empty-state p { margin: 0; font-size: 0.9rem; }
@@ -414,12 +414,12 @@ async function handleUpload() {
 .form-banner-error {
   display: flex; align-items: center; gap: 0.5rem;
   background: rgba(254, 202, 202, 0.45); border: 1px solid rgba(252, 165, 165, 0.5);
-  color: #dc2626; border-radius: 12px; padding: 0.75rem 1rem; font-size: 0.875rem;
+  color: #b91c1c; border-radius: 12px; padding: 0.75rem 1rem; font-size: 0.875rem;
 }
 
 .field { display: flex; flex-direction: column; gap: 0.375rem; }
 .field label { font-size: 0.75rem; font-weight: 600; color: #5b21b6; letter-spacing: 0.04em; text-transform: uppercase; }
-.req { color: #ef4444; margin-left: 2px; }
+.req { color: #b91c1c; margin-left: 2px; }
 
 /* File drop zone */
 .file-drop-zone {
@@ -434,13 +434,13 @@ async function handleUpload() {
   position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
 }
 
-.file-drop-hint { display: flex; flex-direction: column; align-items: center; gap: 0.375rem; color: #7c6fa0; }
+.file-drop-hint { display: flex; flex-direction: column; align-items: center; gap: 0.375rem; color: #675c9c; }
 .drop-icon { font-size: 1.75rem; color: #a78bfa; }
-.drop-limit { font-size: 0.72rem; color: #9ca3af; }
+.drop-limit { font-size: 0.72rem; color: #6b7280; }
 
 .file-selected { display: flex; align-items: center; gap: 0.625rem; color: #15803d; font-size: 0.875rem; justify-content: center; }
 .file-selected .pi { font-size: 1.1rem; }
-.file-size-hint { color: #9ca3af; font-size: 0.75rem; }
+.file-size-hint { color: #6b7280; font-size: 0.75rem; }
 
 .form-actions { display: flex; justify-content: flex-end; gap: 0.75rem; padding-top: 0.5rem; border-top: 1px solid rgba(196, 181, 253, 0.2); }
 </style>

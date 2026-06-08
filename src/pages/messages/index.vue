@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useMessages } from '@/composables/useMessages'
 import { apiUsersGetCollection } from '@/api'
@@ -384,7 +384,7 @@ async function handleSendNew() {
 
 .threads-empty {
   display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
-  padding: 3rem 1rem; color: #7c6fa0; font-size: 0.875rem;
+  padding: 3rem 1rem; color: #675c9c; font-size: 0.875rem;
 }
 .threads-empty .pi { font-size: 1.5rem; opacity: 0.4; }
 .threads-empty p { margin: 0; }
@@ -418,9 +418,9 @@ async function handleSendNew() {
 .thread-top { display: flex; justify-content: space-between; align-items: baseline; gap: 0.25rem; }
 .thread-subject { font-size: 0.8125rem; color: #1e1b4b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
 .thread-subject--bold { font-weight: 700; }
-.thread-date { font-size: 0.68rem; color: #9ca3af; white-space: nowrap; flex-shrink: 0; }
-.thread-preview { font-size: 0.72rem; color: #7c6fa0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
-.thread-sender  { font-size: 0.68rem; color: #9ca3af; margin-top: 2px; }
+.thread-date { font-size: 0.68rem; color: #6b7280; white-space: nowrap; flex-shrink: 0; }
+.thread-preview { font-size: 0.72rem; color: #675c9c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.thread-sender  { font-size: 0.68rem; color: #6b7280; margin-top: 2px; }
 
 .unread-dot {
   width: 8px; height: 8px; border-radius: 50%;
@@ -443,7 +443,7 @@ async function handleSendNew() {
 .thread-placeholder {
   display: flex; flex-direction: column; align-items: center;
   justify-content: center; flex: 1; gap: 1rem;
-  color: #7c6fa0; text-align: center;
+  color: #675c9c; text-align: center;
 }
 .placeholder-icon { font-size: 3rem; opacity: 0.25; }
 .thread-placeholder p { margin: 0; font-size: 0.9rem; }
@@ -474,15 +474,15 @@ async function handleSendNew() {
 }
 .msg-avatar--sm { width: 24px; height: 24px; font-size: 0.55rem; }
 .msg-from { font-size: 0.8125rem; font-weight: 600; color: #1e1b4b; }
-.msg-to   { font-size: 0.75rem; color: #7c6fa0; margin-left: 0.25rem; }
-.msg-date { font-size: 0.72rem; color: #9ca3af; }
+.msg-to   { font-size: 0.75rem; color: #675c9c; margin-left: 0.25rem; }
+.msg-date { font-size: 0.72rem; color: #6b7280; }
 .msg-content { margin: 0; font-size: 0.9rem; line-height: 1.65; white-space: pre-wrap; color: #374151; }
 .msg-footer { display: flex; justify-content: flex-end; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid rgba(196, 181, 253, 0.15); }
 
 /* Replies */
 .replies-section { display: flex; flex-direction: column; gap: 0.75rem; }
-.replies-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #7c6fa0; }
-.no-replies { margin: 0; font-size: 0.85rem; color: #9ca3af; font-style: italic; }
+.replies-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #675c9c; }
+.no-replies { margin: 0; font-size: 0.85rem; color: #6b7280; font-style: italic; }
 
 /* Reply form */
 .reply-form {
@@ -500,7 +500,7 @@ async function handleSendNew() {
 .dash-error {
   display: flex; align-items: center; gap: 0.5rem;
   background: rgba(254, 202, 202, 0.4); border: 1px solid rgba(252, 165, 165, 0.5);
-  color: #dc2626; border-radius: 12px; padding: 0.75rem 1rem; font-size: 0.875rem;
+  color: #b91c1c; border-radius: 12px; padding: 0.75rem 1rem; font-size: 0.875rem;
 }
 
 /* New message dialog */
@@ -519,12 +519,12 @@ async function handleSendNew() {
 .form-banner-error {
   display: flex; align-items: center; gap: 0.5rem;
   background: rgba(254, 202, 202, 0.45); border: 1px solid rgba(252, 165, 165, 0.5);
-  color: #dc2626; border-radius: 12px; padding: 0.75rem 1rem; font-size: 0.875rem;
+  color: #b91c1c; border-radius: 12px; padding: 0.75rem 1rem; font-size: 0.875rem;
 }
 
 .field { display: flex; flex-direction: column; gap: 0.375rem; }
 .field label { font-size: 0.75rem; font-weight: 600; color: #5b21b6; letter-spacing: 0.04em; text-transform: uppercase; }
-.req { color: #ef4444; margin-left: 2px; }
+.req { color: #b91c1c; margin-left: 2px; }
 
 .form-actions { display: flex; justify-content: flex-end; gap: 0.75rem; padding-top: 0.5rem; border-top: 1px solid rgba(196, 181, 253, 0.2); }
 </style>

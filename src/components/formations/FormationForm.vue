@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, watch, computed, onMounted } from 'vue'
 import { apiCategoriesGetCollection } from '@/api'
 import type { FormationFormationRead, CategoryCategoryRead } from '@/api'
@@ -308,12 +308,12 @@ function handleSubmit() {
 }
 
 .required {
-  color: #ef4444;
+  color: #b91c1c;
   margin-left: 2px;
 }
 
 .field-error {
-  color: #dc2626;
+  color: #b91c1c;
   font-size: 0.75rem;
 }
 
@@ -326,7 +326,7 @@ function handleSubmit() {
   border: 1px dashed rgba(196, 181, 253, 0.5);
   border-radius: 10px;
   font-size: 0.8125rem;
-  color: #7c6fa0;
+  color: #675c9c;
   font-family: monospace;
   overflow: hidden;
   text-overflow: ellipsis;

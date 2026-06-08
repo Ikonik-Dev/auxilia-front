@@ -1,42 +1,82 @@
-# auxilia-front
+# Auxilium Front — Frontend
 
-This template should help get you started developing with Vue 3 in Vite.
+## Stack
 
-## Recommended IDE Setup
+| Couche       | Technologie       |
+|--------------|-------------------|
+| Framework    | Vue 3             |
+| Langage      | TypeScript        |
+| Build        | Vite              |
+| UI           | PrimeVue 4        |
+| État         | Pinia             |
+| Charts       | Chart.js          |
+| SDK API      | @hey-api/client-fetch + openapi-ts |
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+---
 
-## Recommended Browser Setup
+## Démarrage local
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
-
-## Type Support for `.vue` Imports in TS
-
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
-
-```sh
+```bash
+# L'API backend doit tourner sur localhost:8080
 npm install
+npm run dev        # http://localhost:5173 — proxy /api → localhost:8080
 ```
 
-### Compile and Hot-Reload for Development
+---
 
-```sh
-npm run dev
+## Commandes utiles
+
+```bash
+npm run build         # build production
+npm run type-check    # vue-tsc --build (0 erreur attendu)
+npm run generate:api  # régénère src/api/generated/ depuis http://localhost:8080/api/docs.json
 ```
 
-### Type-Check, Compile and Minify for Production
+---
 
-```sh
-npm run build
+## SDK TypeScript
+
+Le SDK (`src/api/generated/`) est généré via `openapi-ts` depuis le backend API Platform.
+
+- `types.gen.ts` — types TypeScript pour toutes les entités (~50 types)
+- `sdk.gen.ts` — fonctions typées pour chaque endpoint
+
+**Régénérer après toute modification d'entité backend :**
+
+```bash
+# API backend doit tourner sur localhost:8080
+npm run generate:api
 ```
+
+> **Limitation :** les DTOs dashboard (PHP `array` non typé) ne génèrent pas de types stricts. Les interfaces TypeScript correspondantes (`GlobalKpis`, `TopFormation`, etc.) sont définies localement dans chaque page dashboard.
+
+---
+
+## Architecture
+
+```
+src/
+├── stores/          # Pinia — auth.ts (état utilisateur, login/logout/fetchMe)
+├── api/             # Client SDK hey-api + re-export generated/
+│   └── generated/  # Types + fonctions générés par openapi-ts (ne pas modifier)
+├── composables/     # Logique métier par domaine
+│   ├── useFormations.ts
+│   ├── useUtilisateurs.ts
+│   ├── useInscriptions.ts
+│   ├── useEvaluations.ts
+│   ├── useAssiduite.ts
+│   ├── useParcours.ts
+│   ├── useDocuments.ts
+│   ├── useMessages.ts
+│   ├── useNotifications.ts
+│   └── useStatistiques.ts
+├── pages/           # Pages Vue Router (une par domaine métier)
+├── layouts/         # AppLayout (sidebar + header), AuthLayout (login)
+└── components/      # Composants réutilisables par domaine
+```
+
+**Conventions :**
+- Pas d'appel `fetch()` manuel dans les pages — tout passe par les composables
+- Les composables importent depuis `@/api` (re-export de `@/api/generated`)
+- `credentials: 'include'` requis sur tous les appels (cookies HttpOnly JWT)
+- Le proxy Vite (`/api` → `localhost:8080`) est transparent en dev — pas de CORS à configurer localement

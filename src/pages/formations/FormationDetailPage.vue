@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -260,7 +260,7 @@ async function handleDelete() {
   gap: 0.5rem;
   background: rgba(254, 202, 202, 0.4);
   border: 1px solid rgba(252, 165, 165, 0.5);
-  color: #dc2626;
+  color: #b91c1c;
   border-radius: 12px;
   padding: 0.75rem 1rem;
   font-size: 0.875rem;
@@ -341,7 +341,7 @@ async function handleDelete() {
 
 .stat-lbl {
   font-size: 0.75rem;
-  color: #7c6fa0;
+  color: #675c9c;
 }
 
 /* Sections */

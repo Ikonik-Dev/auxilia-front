@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { apiDashboardstagiaireGet } from '@/api'
 import Card from 'primevue/card'
@@ -12,6 +12,7 @@ interface ActiveEnrollment {
   sessionName: string
   status: string
   progress: string | number
+  sessionDates: { startDate: string | null; endDate: string | null }
 }
 
 interface UpcomingSchedule {
@@ -20,6 +21,7 @@ interface UpcomingSchedule {
   endDatetime: string
   eventType: string
   formationTitle: string
+  location: string | null
 }
 
 interface TodayStats {
@@ -41,6 +43,7 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 
 onMounted(async () => {
+  document.title = 'Mon espace — Auxilium'
   const { data: raw, error: apiError } = await apiDashboardstagiaireGet()
   if (apiError) {
     error.value = 'Impossible de charger le tableau de bord.'
@@ -88,6 +91,11 @@ function fmtDatetime(iso: string): string {
   return new Date(iso).toLocaleString('fr-FR', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+function fmtDate(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
 function minutesToHours(min: number): string {
   if (!min) return '0 min'
   if (min < 60) return `${min} min`
@@ -96,13 +104,13 @@ function minutesToHours(min: number): string {
 </script>
 
 <template>
-  <div>
+  <div :aria-busy="loading">
     <div class="page-header">
-      <h2>Mon espace</h2>
+      <h1>Mon espace</h1>
       <Tag value="Stagiaire" severity="secondary" />
     </div>
 
-    <div v-if="error" class="dash-error">
+    <div v-if="error" role="alert" aria-live="assertive" class="dash-error">
       <i class="pi pi-exclamation-triangle" /> {{ error }}
     </div>
 
@@ -178,6 +186,10 @@ function minutesToHours(min: number): string {
               class="enrollment-progress"
             />
           </div>
+          <div v-if="enrollment.sessionDates?.startDate || enrollment.sessionDates?.endDate" class="session-dates">
+            <i class="pi pi-calendar" aria-hidden="true" />
+            <span>{{ fmtDate(enrollment.sessionDates.startDate) }} → {{ fmtDate(enrollment.sessionDates.endDate) }}</span>
+          </div>
         </div>
       </div>
 
@@ -201,6 +213,9 @@ function minutesToHours(min: number): string {
           <div class="schedule-info">
             <span class="schedule-event">{{ eventTypeLabel(schedule.eventType) }} — {{ schedule.formationTitle }}</span>
             <span class="schedule-time">{{ fmtDatetime(schedule.startDatetime) }}</span>
+            <span v-if="schedule.location" class="schedule-location">
+              <i class="pi pi-map-marker" aria-hidden="true" />{{ schedule.location }}
+            </span>
           </div>
         </div>
       </div>
@@ -264,7 +279,7 @@ function minutesToHours(min: number): string {
 
 .today-label {
   font-size: 0.75rem;
-  color: #7c6fa0;
+  color: #675c9c;
   font-weight: 500;
 }
 
@@ -318,7 +333,7 @@ function minutesToHours(min: number): string {
 
 .enrollment-session {
   font-size: 0.75rem;
-  color: #7c6fa0;
+  color: #675c9c;
 }
 
 .progress-wrap {
@@ -331,12 +346,26 @@ function minutesToHours(min: number): string {
   display: flex;
   justify-content: space-between;
   font-size: 0.75rem;
-  color: #7c6fa0;
+  color: #675c9c;
 }
 
 .progress-pct {
   font-weight: 600;
   color: #6d28d9;
+}
+
+.session-dates {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.625rem;
+  font-size: 0.75rem;
+  color: #675c9c;
+}
+
+.session-dates .pi {
+  font-size: 0.7rem;
+  color: #a78bfa;
 }
 
 .enrollment-progress {
@@ -400,7 +429,19 @@ function minutesToHours(min: number): string {
 
 .schedule-time {
   font-size: 0.75rem;
-  color: #7c6fa0;
+  color: #675c9c;
+}
+
+.schedule-location {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  color: #6b7280;
+}
+
+.schedule-location .pi {
+  font-size: 0.65rem;
 }
 
 .dash-error {
@@ -409,7 +450,7 @@ function minutesToHours(min: number): string {
   gap: 0.5rem;
   background: rgba(254, 202, 202, 0.4);
   border: 1px solid rgba(252, 165, 165, 0.5);
-  color: #dc2626;
+  color: #b91c1c;
   border-radius: 12px;
   padding: 0.75rem 1rem;
   margin-bottom: 1.5rem;
@@ -422,7 +463,7 @@ function minutesToHours(min: number): string {
   align-items: center;
   gap: 0.5rem;
   padding: 3rem 1rem;
-  color: #7c6fa0;
+  color: #675c9c;
   background: rgba(255, 255, 255, 0.35);
   border-radius: 16px;
   border: 1px dashed rgba(196, 181, 253, 0.5);

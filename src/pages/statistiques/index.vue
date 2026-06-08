@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import {
   Chart as ChartJS,
@@ -72,8 +72,8 @@ const chartOptions = {
     tooltip: { backgroundColor: 'rgba(30,27,75,0.9)', titleColor: '#c4b5fd', bodyColor: '#e9d5ff' },
   },
   scales: {
-    x: { grid: { color: 'rgba(196,181,253,0.15)' }, ticks: { color: '#7c6fa0', font: { family: 'Inter' } } },
-    y: { grid: { color: 'rgba(196,181,253,0.15)' }, ticks: { color: '#7c6fa0', font: { family: 'Inter' } }, beginAtZero: true },
+    x: { grid: { color: 'rgba(196,181,253,0.15)' }, ticks: { color: '#675c9c', font: { family: 'Inter' } } },
+    y: { grid: { color: 'rgba(196,181,253,0.15)' }, ticks: { color: '#675c9c', font: { family: 'Inter' } }, beginAtZero: true },
   },
 }
 
@@ -561,7 +561,7 @@ function exportUsers() {
 }
 
 :deep(.p-tab) {
-  color: #7c6fa0 !important; font-weight: 500 !important;
+  color: #675c9c !important; font-weight: 500 !important;
   border-bottom: 2px solid transparent !important;
   padding: 0.875rem 1rem !important; transition: color 0.15s, border-color 0.15s !important;
 }
@@ -588,7 +588,7 @@ function exportUsers() {
 }
 
 .kpi-card { text-align: center; }
-.kpi-sub  { font-size: 0.72rem; color: #7c6fa0; margin: 0.2rem 0 0; }
+.kpi-sub  { font-size: 0.72rem; color: #675c9c; margin: 0.2rem 0 0; }
 
 /* Charts */
 .charts-row {
@@ -616,7 +616,7 @@ function exportUsers() {
 
 .chart-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  height: 100%; gap: 0.5rem; color: #7c6fa0; font-size: 0.875rem;
+  height: 100%; gap: 0.5rem; color: #675c9c; font-size: 0.875rem;
 }
 .chart-empty .pi { font-size: 2rem; opacity: 0.3; }
 
@@ -645,14 +645,14 @@ function exportUsers() {
 .dash-error {
   display: flex; align-items: center; gap: 0.5rem;
   background: rgba(254, 202, 202, 0.4); border: 1px solid rgba(252, 165, 165, 0.5);
-  color: #dc2626; border-radius: 12px; padding: 0.75rem 1rem; font-size: 0.875rem;
+  color: #b91c1c; border-radius: 12px; padding: 0.75rem 1rem; font-size: 0.875rem;
 }
 
 .empty-state {
-  display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 2.5rem 1rem; color: #7c6fa0;
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 2.5rem 1rem; color: #675c9c;
 }
 .empty-state .pi { font-size: 1.75rem; opacity: 0.3; }
 .empty-state p   { margin: 0; font-size: 0.875rem; }
 
-.muted { color: #9ca3af; font-style: italic; }
+.muted { color: #6b7280; font-style: italic; }
 </style>
