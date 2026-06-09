@@ -1,6 +1,7 @@
-﻿<script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+<script setup lang="ts">
+import { onMounted, nextTick, onUnmounted, ref } from 'vue'
 import { apiDashboarddirecteurGet } from '@/api'
+import { useDashboard } from '@/composables/useDashboard'
 import {
   Chart,
   LineController,
@@ -16,6 +17,7 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import Skeleton from 'primevue/skeleton'
+import Button from 'primevue/button'
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Filler)
 
@@ -50,21 +52,15 @@ interface DirecteurData {
   periodTrends: PeriodTrend[]
 }
 
-const data = ref<DirecteurData | null>(null)
-const loading = ref(true)
-const error = ref<string | null>(null)
+const { data, loading, error, isRateLimited, rateLimitSeconds, load, refetch } =
+  useDashboard<DirecteurData>(apiDashboarddirecteurGet)
+
 const chartCanvas = ref<HTMLCanvasElement | null>(null)
 let chartInstance: Chart | null = null
 
 onMounted(async () => {
   document.title = 'Tableau de bord — Auxilium'
-  const { data: raw, error: apiError } = await apiDashboarddirecteurGet()
-  if (apiError) {
-    error.value = 'Impossible de charger le tableau de bord.'
-  } else {
-    data.value = raw as unknown as DirecteurData
-  }
-  loading.value = false
+  await load()
   await nextTick()
   buildChart()
 })
@@ -142,6 +138,12 @@ function buildChart() {
   })
 }
 
+async function retry() {
+  await refetch()
+  await nextTick()
+  buildChart()
+}
+
 function fmt(val: string | number | null | undefined, suffix = ''): string {
   if (val === null || val === undefined) return '—'
   const n = parseFloat(String(val))
@@ -156,8 +158,24 @@ function fmt(val: string | number | null | undefined, suffix = ''): string {
       <Tag value="Directeur" severity="info" />
     </div>
 
-    <div v-if="error" role="alert" aria-live="assertive" class="dash-error">
+    <!-- Rate limit 429 -->
+    <div v-if="isRateLimited" role="alert" aria-live="polite" class="dash-warn">
+      <i class="pi pi-clock" />
+      {{ error }} ({{ rateLimitSeconds }}s)
+    </div>
+
+    <!-- Erreur générale -->
+    <div v-else-if="error" role="alert" aria-live="assertive" class="dash-error">
       <i class="pi pi-exclamation-triangle" /> {{ error }}
+      <Button
+        label="Réessayer"
+        icon="pi pi-refresh"
+        size="small"
+        severity="danger"
+        text
+        class="ml-2"
+        @click="retry"
+      />
     </div>
 
     <!-- KPI cards -->
@@ -174,7 +192,7 @@ function fmt(val: string | number | null | undefined, suffix = ''): string {
       <template v-else-if="data">
         <Card class="kpi-card">
           <template #content>
-            <div class="kpi-inner">
+            <div class="kpi-inner" :aria-label="`Formations total : ${data.globalKpis.totalFormations}`">
               <i class="pi pi-book kpi-icon" aria-hidden="true" />
               <span class="stat-value">{{ data.globalKpis.totalFormations ?? '—' }}</span>
               <span class="stat-sub">Formations</span>
@@ -183,7 +201,7 @@ function fmt(val: string | number | null | undefined, suffix = ''): string {
         </Card>
         <Card class="kpi-card">
           <template #content>
-            <div class="kpi-inner">
+            <div class="kpi-inner" :aria-label="`Utilisateurs total : ${data.globalKpis.totalUsers}`">
               <i class="pi pi-users kpi-icon" aria-hidden="true" />
               <span class="stat-value">{{ data.globalKpis.totalUsers ?? '—' }}</span>
               <span class="stat-sub">Utilisateurs</span>
@@ -192,7 +210,7 @@ function fmt(val: string | number | null | undefined, suffix = ''): string {
         </Card>
         <Card class="kpi-card">
           <template #content>
-            <div class="kpi-inner">
+            <div class="kpi-inner" :aria-label="`Inscriptions actives : ${data.globalKpis.activeEnrollments}`">
               <i class="pi pi-spinner kpi-icon" aria-hidden="true" />
               <span class="stat-value">{{ data.globalKpis.activeEnrollments ?? '—' }}</span>
               <span class="stat-sub">Inscriptions actives</span>
@@ -201,7 +219,7 @@ function fmt(val: string | number | null | undefined, suffix = ''): string {
         </Card>
         <Card class="kpi-card">
           <template #content>
-            <div class="kpi-inner">
+            <div class="kpi-inner" :aria-label="`Taux de complétion moyen : ${fmt(data.globalKpis.avgCompletionRate, ' %')}`">
               <i class="pi pi-chart-line kpi-icon" aria-hidden="true" />
               <span class="stat-value">{{ fmt(data.globalKpis.avgCompletionRate, ' %') }}</span>
               <span class="stat-sub">Taux de complétion</span>
@@ -219,9 +237,13 @@ function fmt(val: string | number | null | undefined, suffix = ''): string {
         <Skeleton height="100%" border-radius="16px" />
       </div>
 
-      <div v-else-if="data?.periodTrends?.length" class="chart-wrap">
+      <figure v-else-if="data?.periodTrends?.length" class="chart-wrap">
         <canvas ref="chartCanvas" aria-label="Graphique linéaire du taux de complétion par période" role="img" />
-      </div>
+        <figcaption class="sr-only">
+          Tendance du taux de complétion moyen sur {{ data.periodTrends.length }} périodes.
+          Dernière valeur : {{ fmt(data.periodTrends.at(-1)?.avgCompletionRate, ' %') }}.
+        </figcaption>
+      </figure>
 
       <div v-else-if="!loading" class="empty-state">
         <i class="pi pi-chart-line" />
@@ -243,6 +265,7 @@ function fmt(val: string | number | null | undefined, suffix = ''): string {
         class="glass-table"
         :rows="10"
         striped-rows
+        aria-label="Classement des formations par taux de complétion"
       >
         <Column field="title" header="Formation" />
         <Column field="completedEnrollments" header="Complétées" style="width: 130px; text-align: right" />
@@ -328,6 +351,7 @@ function fmt(val: string | number | null | undefined, suffix = ''): string {
   border: 1px solid rgba(255, 255, 255, 0.55);
   border-radius: 16px;
   padding: 1.25rem;
+  margin: 0;
 }
 
 .chart-skeleton {
@@ -371,7 +395,7 @@ function fmt(val: string | number | null | undefined, suffix = ''): string {
   background: rgba(167, 139, 250, 0.08) !important;
 }
 
-/* Error */
+/* Error / warn banners */
 .dash-error {
   display: flex;
   align-items: center;
@@ -379,6 +403,19 @@ function fmt(val: string | number | null | undefined, suffix = ''): string {
   background: rgba(254, 202, 202, 0.4);
   border: 1px solid rgba(252, 165, 165, 0.5);
   color: #b91c1c;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+}
+
+.dash-warn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(254, 243, 199, 0.5);
+  border: 1px solid rgba(253, 230, 138, 0.6);
+  color: #92400e;
   border-radius: 12px;
   padding: 0.75rem 1rem;
   margin-bottom: 1.5rem;
@@ -406,5 +443,20 @@ function fmt(val: string | number | null | undefined, suffix = ''): string {
 .empty-state p {
   margin: 0;
   font-size: 0.9rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.ml-2 {
+  margin-left: 0.5rem;
 }
 </style>

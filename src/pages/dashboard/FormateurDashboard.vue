@@ -1,6 +1,7 @@
-﻿<script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+<script setup lang="ts">
+import { onMounted, computed } from 'vue'
 import { apiDashboardformateurGet } from '@/api'
+import { useDashboard } from '@/composables/useDashboard'
 import Card from 'primevue/card'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -42,19 +43,12 @@ interface FormateurData {
 }
 
 const router = useRouter()
-const data = ref<FormateurData | null>(null)
-const loading = ref(true)
-const error = ref<string | null>(null)
+const { data, loading, error, isRateLimited, rateLimitSeconds, load, refetch } =
+  useDashboard<FormateurData>(apiDashboardformateurGet)
 
 onMounted(async () => {
   document.title = 'Tableau de bord — Auxilium'
-  const { data: raw, error: apiError } = await apiDashboardformateurGet()
-  if (apiError) {
-    error.value = 'Impossible de charger le tableau de bord.'
-  } else {
-    data.value = raw as unknown as FormateurData
-  }
-  loading.value = false
+  await load()
 })
 
 const pendingCount = computed(() => data.value?.pendingEnrollmentsCount ?? 0)
@@ -111,8 +105,24 @@ function fmtDatetime(iso: string): string {
       <Tag value="Formateur" severity="success" />
     </div>
 
-    <div v-if="error" role="alert" aria-live="assertive" class="dash-error">
+    <!-- Rate limit 429 -->
+    <div v-if="isRateLimited" role="alert" aria-live="polite" class="dash-warn">
+      <i class="pi pi-clock" />
+      {{ error }} ({{ rateLimitSeconds }}s)
+    </div>
+
+    <!-- Erreur générale -->
+    <div v-else-if="error" role="alert" aria-live="assertive" class="dash-error">
       <i class="pi pi-exclamation-triangle" /> {{ error }}
+      <Button
+        label="Réessayer"
+        icon="pi pi-refresh"
+        size="small"
+        severity="danger"
+        text
+        class="ml-2"
+        @click="refetch"
+      />
     </div>
 
     <!-- KPI cards -->
@@ -129,7 +139,7 @@ function fmtDatetime(iso: string): string {
       <template v-else-if="data">
         <Card class="kpi-card">
           <template #content>
-            <div class="kpi-inner">
+            <div class="kpi-inner" :aria-label="`Sessions assignées : ${data.mySessions?.length ?? 0}`">
               <i class="pi pi-calendar-plus kpi-icon" aria-hidden="true" />
               <span class="stat-value">{{ data.mySessions?.length ?? 0 }}</span>
               <span class="stat-sub">Sessions assignées</span>
@@ -138,7 +148,7 @@ function fmtDatetime(iso: string): string {
         </Card>
         <Card class="kpi-card">
           <template #content>
-            <div class="kpi-inner">
+            <div class="kpi-inner" :aria-label="`Assiduités récentes : ${data.recentAttendances?.length ?? 0}`">
               <i class="pi pi-users kpi-icon" aria-hidden="true" />
               <span class="stat-value">{{ data.recentAttendances?.length ?? 0 }}</span>
               <span class="stat-sub">Assiduités récentes</span>
@@ -147,7 +157,7 @@ function fmtDatetime(iso: string): string {
         </Card>
         <Card class="kpi-card">
           <template #content>
-            <div class="kpi-inner">
+            <div class="kpi-inner" :aria-label="`Inscriptions à valider : ${pendingCount}`">
               <i
                 class="pi pi-bell kpi-icon"
                 :class="{ 'kpi-icon--warn': pendingCount > 0 }"
@@ -176,6 +186,7 @@ function fmtDatetime(iso: string): string {
         :value="data.mySessions"
         class="glass-table"
         striped-rows
+        aria-label="Liste de mes sessions de formation"
       >
         <Column field="name" header="Session" />
         <Column field="formationTitle" header="Formation" />
@@ -240,6 +251,7 @@ function fmtDatetime(iso: string): string {
         class="glass-table"
         :rows="10"
         striped-rows
+        aria-label="Assiduités récentes des stagiaires"
       >
         <Column field="userName" header="Stagiaire" />
         <Column header="Date" style="width: 160px">
@@ -443,7 +455,7 @@ function fmtDatetime(iso: string): string {
   color: #675c9c;
 }
 
-/* Error */
+/* Error / warn banners */
 .dash-error {
   display: flex;
   align-items: center;
@@ -451,6 +463,19 @@ function fmtDatetime(iso: string): string {
   background: rgba(254, 202, 202, 0.4);
   border: 1px solid rgba(252, 165, 165, 0.5);
   color: #b91c1c;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+}
+
+.dash-warn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(254, 243, 199, 0.5);
+  border: 1px solid rgba(253, 230, 138, 0.6);
+  color: #92400e;
   border-radius: 12px;
   padding: 0.75rem 1rem;
   margin-bottom: 1.5rem;
@@ -478,5 +503,9 @@ function fmtDatetime(iso: string): string {
 .empty-state p {
   margin: 0;
   font-size: 0.9rem;
+}
+
+.ml-2 {
+  margin-left: 0.5rem;
 }
 </style>

@@ -1,10 +1,12 @@
-﻿<script setup lang="ts">
-import { ref, onMounted } from 'vue'
+<script setup lang="ts">
+import { onMounted } from 'vue'
 import { apiDashboardstagiaireGet } from '@/api'
+import { useDashboard } from '@/composables/useDashboard'
 import Card from 'primevue/card'
 import ProgressBar from 'primevue/progressbar'
 import Tag from 'primevue/tag'
 import Skeleton from 'primevue/skeleton'
+import Button from 'primevue/button'
 
 interface ActiveEnrollment {
   id: number
@@ -38,19 +40,12 @@ interface StagiaireData {
   todayStats: TodayStats | null
 }
 
-const data = ref<StagiaireData | null>(null)
-const loading = ref(true)
-const error = ref<string | null>(null)
+const { data, loading, error, isRateLimited, rateLimitSeconds, load, refetch } =
+  useDashboard<StagiaireData>(apiDashboardstagiaireGet)
 
 onMounted(async () => {
   document.title = 'Mon espace — Auxilium'
-  const { data: raw, error: apiError } = await apiDashboardstagiaireGet()
-  if (apiError) {
-    error.value = 'Impossible de charger le tableau de bord.'
-  } else {
-    data.value = raw as unknown as StagiaireData
-  }
-  loading.value = false
+  await load()
 })
 
 function progressValue(progress: string | number): number {
@@ -110,8 +105,24 @@ function minutesToHours(min: number): string {
       <Tag value="Stagiaire" severity="secondary" />
     </div>
 
-    <div v-if="error" role="alert" aria-live="assertive" class="dash-error">
+    <!-- Rate limit 429 -->
+    <div v-if="isRateLimited" role="alert" aria-live="polite" class="dash-warn">
+      <i class="pi pi-clock" />
+      {{ error }} ({{ rateLimitSeconds }}s)
+    </div>
+
+    <!-- Erreur générale -->
+    <div v-else-if="error" role="alert" aria-live="assertive" class="dash-error">
       <i class="pi pi-exclamation-triangle" /> {{ error }}
+      <Button
+        label="Réessayer"
+        icon="pi pi-refresh"
+        size="small"
+        severity="danger"
+        text
+        class="ml-2"
+        @click="refetch"
+      />
     </div>
 
     <!-- Today's stats -->
@@ -444,6 +455,7 @@ function minutesToHours(min: number): string {
   font-size: 0.65rem;
 }
 
+/* Error / warn banners */
 .dash-error {
   display: flex;
   align-items: center;
@@ -457,6 +469,20 @@ function minutesToHours(min: number): string {
   font-size: 0.875rem;
 }
 
+.dash-warn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(254, 243, 199, 0.5);
+  border: 1px solid rgba(253, 230, 138, 0.6);
+  color: #92400e;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+}
+
+/* Empty state */
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -477,5 +503,9 @@ function minutesToHours(min: number): string {
 .empty-state p {
   margin: 0;
   font-size: 0.9rem;
+}
+
+.ml-2 {
+  margin-left: 0.5rem;
 }
 </style>

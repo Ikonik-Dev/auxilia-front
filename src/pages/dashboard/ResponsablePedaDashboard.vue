@@ -1,6 +1,7 @@
-﻿<script setup lang="ts">
-import { ref, onMounted } from 'vue'
+<script setup lang="ts">
+import { onMounted } from 'vue'
 import { apiDashboardresponsablePedaGet } from '@/api'
+import { useDashboard } from '@/composables/useDashboard'
 import Card from 'primevue/card'
 import Tag from 'primevue/tag'
 import Skeleton from 'primevue/skeleton'
@@ -38,19 +39,12 @@ interface ResponsableData {
 }
 
 const router = useRouter()
-const data = ref<ResponsableData | null>(null)
-const loading = ref(true)
-const error = ref<string | null>(null)
+const { data, loading, error, isRateLimited, rateLimitSeconds, load, refetch } =
+  useDashboard<ResponsableData>(apiDashboardresponsablePedaGet)
 
 onMounted(async () => {
   document.title = 'Tableau de bord — Auxilium'
-  const { data: raw, error: apiError } = await apiDashboardresponsablePedaGet()
-  if (apiError) {
-    error.value = 'Impossible de charger le tableau de bord.'
-  } else {
-    data.value = raw as unknown as ResponsableData
-  }
-  loading.value = false
+  await load()
 })
 
 function fmt(val: number | null | undefined, suffix = ''): string {
@@ -71,8 +65,24 @@ function fmtDate(iso: string): string {
       <Tag value="Responsable pédagogique" severity="warn" />
     </div>
 
-    <div v-if="error" role="alert" aria-live="assertive" class="dash-error">
+    <!-- Rate limit 429 -->
+    <div v-if="isRateLimited" role="alert" aria-live="polite" class="dash-warn">
+      <i class="pi pi-clock" />
+      {{ error }} ({{ rateLimitSeconds }}s)
+    </div>
+
+    <!-- Erreur générale -->
+    <div v-else-if="error" role="alert" aria-live="assertive" class="dash-error">
       <i class="pi pi-exclamation-triangle" /> {{ error }}
+      <Button
+        label="Réessayer"
+        icon="pi pi-refresh"
+        size="small"
+        severity="danger"
+        text
+        class="ml-2"
+        @click="refetch"
+      />
     </div>
 
     <!-- KPI cards -->
@@ -89,7 +99,7 @@ function fmtDate(iso: string): string {
       <template v-else-if="data">
         <Card class="kpi-card">
           <template #content>
-            <div class="kpi-inner">
+            <div class="kpi-inner" :aria-label="`Inscriptions ce mois : ${data.kpis.totalEnrollments}`">
               <i class="pi pi-users kpi-icon" aria-hidden="true" />
               <span class="stat-value">{{ data.kpis.totalEnrollments ?? '—' }}</span>
               <span class="stat-sub">Inscriptions ce mois</span>
@@ -98,7 +108,7 @@ function fmtDate(iso: string): string {
         </Card>
         <Card class="kpi-card">
           <template #content>
-            <div class="kpi-inner">
+            <div class="kpi-inner" :aria-label="`Inscriptions actives : ${data.kpis.activeEnrollments}`">
               <i class="pi pi-spinner kpi-icon" aria-hidden="true" />
               <span class="stat-value">{{ data.kpis.activeEnrollments ?? '—' }}</span>
               <span class="stat-sub">Actives</span>
@@ -107,7 +117,7 @@ function fmtDate(iso: string): string {
         </Card>
         <Card class="kpi-card">
           <template #content>
-            <div class="kpi-inner">
+            <div class="kpi-inner" :aria-label="`Inscriptions complétées : ${data.kpis.completedEnrollments}`">
               <i class="pi pi-verified kpi-icon" aria-hidden="true" />
               <span class="stat-value">{{ data.kpis.completedEnrollments ?? '—' }}</span>
               <span class="stat-sub">Complétées</span>
@@ -116,7 +126,7 @@ function fmtDate(iso: string): string {
         </Card>
         <Card class="kpi-card">
           <template #content>
-            <div class="kpi-inner">
+            <div class="kpi-inner" :aria-label="`Taux de complétion moyen : ${fmt(data.kpis.avgCompletionRate, ' %')}`">
               <i class="pi pi-chart-line kpi-icon" aria-hidden="true" />
               <span class="stat-value">{{ fmt(data.kpis.avgCompletionRate, ' %') }}</span>
               <span class="stat-sub">Taux de complétion</span>
@@ -125,7 +135,7 @@ function fmtDate(iso: string): string {
         </Card>
         <Card class="kpi-card">
           <template #content>
-            <div class="kpi-inner">
+            <div class="kpi-inner" :aria-label="`Moyenne générale : ${fmt(data.kpis.avgGrade)}`">
               <i class="pi pi-star kpi-icon" aria-hidden="true" />
               <span class="stat-value">{{ fmt(data.kpis.avgGrade) }}</span>
               <span class="stat-sub">Moyenne générale</span>
@@ -419,7 +429,7 @@ function fmtDate(iso: string): string {
   font-style: italic;
 }
 
-/* Error */
+/* Error / warn banners */
 .dash-error {
   display: flex;
   align-items: center;
@@ -427,6 +437,19 @@ function fmtDate(iso: string): string {
   background: rgba(254, 202, 202, 0.4);
   border: 1px solid rgba(252, 165, 165, 0.5);
   color: #b91c1c;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+}
+
+.dash-warn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(254, 243, 199, 0.5);
+  border: 1px solid rgba(253, 230, 138, 0.6);
+  color: #92400e;
   border-radius: 12px;
   padding: 0.75rem 1rem;
   margin-bottom: 1.5rem;
@@ -454,5 +477,9 @@ function fmtDate(iso: string): string {
 .empty-state p {
   margin: 0;
   font-size: 0.9rem;
+}
+
+.ml-2 {
+  margin-left: 0.5rem;
 }
 </style>
