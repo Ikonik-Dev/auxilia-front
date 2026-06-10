@@ -166,9 +166,12 @@ router.beforeEach(async (to) => {
   }
 
   if (!auth.isAuthenticated) {
-    const refreshed = await auth.refresh()
-    if (!refreshed) {
-      return { name: 'login' }
+    await auth.fetchMe()
+    if (!auth.isAuthenticated) {
+      const refreshed = await auth.refresh()
+      if (!refreshed) {
+        return { name: 'login' }
+      }
     }
   }
 
