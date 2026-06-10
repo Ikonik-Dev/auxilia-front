@@ -2,8 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useEvaluations } from '@/composables/useEvaluations'
-import { apiUsersGetCollection } from '@/api'
-import type { EvaluationSubmissionSubmissionRead } from '@/api'
+import type { EvaluationSubmissionSubmissionReadUserSummaryUserSummary } from '@/api'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
@@ -30,21 +29,10 @@ const canGrade = computed(() =>
   auth.hasRole('ROLE_FORMATEUR') || auth.hasRole('ROLE_ADMIN') || auth.hasRole('ROLE_DIRECTEUR'),
 )
 
-// ── User lookup ──
-const userMap = ref(new Map<string, string>())
-
-async function loadUsers() {
-  const { data } = await apiUsersGetCollection()
-  const map = new Map<string, string>()
-  for (const u of data ?? []) {
-    if (u.id) map.set(`/api/users/${u.id}`, `${u.firstName} ${u.lastName}`)
-  }
-  userMap.value = map
-}
-
-function getUserName(iri: string | null | undefined): string {
-  if (!iri) return '—'
-  return userMap.value.get(iri) ?? `#${iri.split('/').pop()}`
+function getUserName(user: { firstName?: string; lastName?: string } | string | null | undefined): string {
+  if (!user) return '—'
+  if (typeof user === 'object') return `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || '—'
+  return `#${user.split('/').pop()}`
 }
 
 // ── Evaluation lookup ──
@@ -70,7 +58,6 @@ function getEvalMaxScore(iri: string | null | undefined): number {
 onMounted(() => {
   document.title = 'Évaluations — Auxilium'
   fetchEvaluations()
-  loadUsers()
 })
 
 // ── Helpers ──
@@ -122,13 +109,13 @@ function formatDate(iso: string | null | undefined): string {
 
 // ── Grading Dialog ──
 const showGrade    = ref(false)
-const gradeTarget  = ref<EvaluationSubmissionSubmissionRead | null>(null)
+const gradeTarget  = ref<EvaluationSubmissionSubmissionReadUserSummary | null>(null)
 const gradeScore   = ref<number | null>(null)
 const gradeFeedback = ref('')
 const grading      = ref(false)
 const gradeError   = ref<string | null>(null)
 
-function openGrade(submission: EvaluationSubmissionSubmissionRead) {
+function openGrade(submission: EvaluationSubmissionSubmissionReadUserSummary) {
   gradeTarget.value  = submission
   gradeScore.value   = null
   gradeFeedback.value = ''

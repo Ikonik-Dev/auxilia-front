@@ -2,8 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useAssiduite } from '@/composables/useAssiduite'
 import type { Participant } from '@/composables/useAssiduite'
-import { apiUsersGetCollection } from '@/api'
-import type { ScheduleScheduleRead } from '@/api'
+import type { ScheduleScheduleReadUserSummary } from '@/api'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
@@ -26,31 +25,13 @@ const {
   saveBatch,
 } = useAssiduite()
 
-// ── User lookup ──
-const userMap = ref(new Map<string, string>())
-
-async function loadUsers() {
-  const { data } = await apiUsersGetCollection()
-  const map = new Map<string, string>()
-  for (const u of data ?? []) {
-    if (u.id) map.set(`/api/users/${u.id}`, `${u.firstName} ${u.lastName}`)
-  }
-  userMap.value = map
-}
-
-function getUserName(iri: string): string {
-  return userMap.value.get(iri) ?? `#${iri.split('/').pop()}`
-}
-
-function getUserInitials(iri: string): string {
-  const name = getUserName(iri)
+function nameInitials(name: string): string {
   return name.split(' ').map((n) => n[0] ?? '').join('').toUpperCase().slice(0, 2)
 }
 
 onMounted(() => {
   document.title = 'Assiduité — Auxilium'
   fetchSchedules()
-  loadUsers()
 })
 
 // ── Status options ──
@@ -196,9 +177,9 @@ const stats = computed(() => {
             class="schedule-item"
             :class="{ 'schedule-item--active': selectedSchedule?.id === schedule.id }"
             tabindex="0"
-            @click="selectSchedule(schedule as ScheduleScheduleRead)"
-            @keydown.enter="selectSchedule(schedule as ScheduleScheduleRead)"
-            @keydown.space.prevent="selectSchedule(schedule as ScheduleScheduleRead)"
+            @click="selectSchedule(schedule as ScheduleScheduleReadUserSummary)"
+            @keydown.enter="selectSchedule(schedule as ScheduleScheduleReadUserSummary)"
+            @keydown.space.prevent="selectSchedule(schedule as ScheduleScheduleReadUserSummary)"
           >
             <div class="schedule-item-top">
               <span class="schedule-type">{{ eventTypeLabel(schedule.eventType) }}</span>
@@ -299,9 +280,9 @@ const stats = computed(() => {
               <template #body="{ data }">
                 <div class="user-cell">
                   <div class="user-avatar-sm" :class="`status-bg--${getStatus(data) || 'none'}`">
-                    {{ getUserInitials(data.userIri) }}
+                    {{ nameInitials(data.fullName) }}
                   </div>
-                  <span class="user-name">{{ getUserName(data.userIri) }}</span>
+                  <span class="user-name">{{ data.fullName }}</span>
                 </div>
               </template>
             </Column>
@@ -315,7 +296,7 @@ const stats = computed(() => {
                   option-label="label"
                   option-value="value"
                   placeholder="— Non renseigné —"
-                  :aria-label="`Statut de ${getUserName(data.userIri)}`"
+                  :aria-label="`Statut de ${data.fullName}`"
                   class="status-select"
                   @change="(e) => onStatusChange(data.userIri, e.value as string)"
                 />

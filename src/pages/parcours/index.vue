@@ -8,6 +8,8 @@ import ProgressBar from 'primevue/progressbar'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Skeleton from 'primevue/skeleton'
+import Dialog from 'primevue/dialog'
+import Button from 'primevue/button'
 import { useToast } from 'primevue/usetoast'
 import Toast from 'primevue/toast'
 
@@ -80,13 +82,25 @@ function lessonTypeLabel(t: string | null): string {
 
 const updatingLesson = ref<number | null>(null)
 
-async function handleLessonClick(lesson: LessonRow) {
+// ── Dialog lecteur de leçon ──
+const activeLesson    = ref<LessonRow | null>(null)
+const lessonDialogVisible = ref(false)
+
+function openLesson(lesson: LessonRow) {
+  activeLesson.value = lesson
+  lessonDialogVisible.value = true
+}
+
+async function setLessonStatus(lesson: LessonRow, status: 'not_started' | 'in_progress' | 'completed') {
   if (updatingLesson.value === lesson.id) return
-  const nextStatus = LESSON_STATUS_CONFIG[lesson.status].next
   updatingLesson.value = lesson.id
   try {
-    await updateLessonStatus(lesson, nextStatus)
-    if (nextStatus === 'completed') {
+    await updateLessonStatus(lesson, status)
+    // Sync activeLesson so Dialog buttons update
+    if (activeLesson.value?.id === lesson.id) {
+      activeLesson.value = { ...activeLesson.value, status }
+    }
+    if (status === 'completed') {
       toast.add({ severity: 'success', summary: 'Leçon terminée !', detail: lesson.title, life: 2500 })
     }
   } catch {
@@ -248,9 +262,9 @@ const STATUS_LABELS: Record<string, string> = {
                   :key="lesson.id"
                   class="lesson-row"
                   :class="`lesson-row--${lesson.status}`"
-                  :aria-label="`${lesson.title} — ${LESSON_STATUS_CONFIG[lesson.status].label}. Cliquer pour changer le statut.`"
+                  :aria-label="`${lesson.title} — ${LESSON_STATUS_CONFIG[lesson.status].label}. Cliquer pour ouvrir.`"
                   :disabled="updatingLesson === lesson.id"
-                  @click="handleLessonClick(lesson)"
+                  @click="openLesson(lesson)"
                 >
                   <!-- Icône statut -->
                   <span class="lesson-status-icon" :class="`icon--${lesson.status}`">
@@ -330,6 +344,72 @@ const STATUS_LABELS: Record<string, string> = {
       </div>
     </template>
   </div>
+
+  <!-- Dialog lecteur de leçon -->
+  <Dialog
+    v-model:visible="lessonDialogVisible"
+    :header="activeLesson?.title ?? ''"
+    modal
+    :style="{ width: 'min(680px, 95vw)' }"
+    :pt="{ root: { class: 'lesson-dialog' } }"
+    @hide="activeLesson = null"
+  >
+    <template v-if="activeLesson">
+      <!-- Méta -->
+      <div class="lesson-dialog-meta">
+        <Tag v-if="activeLesson.lessonType" :value="lessonTypeLabel(activeLesson.lessonType)" severity="info" />
+        <span v-if="activeLesson.durationMinutes" class="dialog-duration">
+          <i class="pi pi-clock" /> {{ activeLesson.durationMinutes }} min
+        </span>
+        <Tag
+          :value="LESSON_STATUS_CONFIG[activeLesson.status].label"
+          :severity="activeLesson.status === 'completed' ? 'success' : activeLesson.status === 'in_progress' ? 'warn' : 'secondary'"
+        />
+      </div>
+
+      <!-- Contenu -->
+      <div class="lesson-dialog-content">
+        <div v-if="activeLesson.content" class="lesson-content-body" v-html="activeLesson.content" />
+        <div v-else class="lesson-no-content">
+          <i class="pi pi-info-circle" />
+          <span>Pas de contenu disponible pour cette leçon.</span>
+        </div>
+      </div>
+
+      <!-- Actions statut -->
+      <div class="lesson-dialog-actions">
+        <Button
+          v-if="activeLesson.status !== 'in_progress'"
+          label="Marquer comme en cours"
+          icon="pi pi-circle-fill"
+          severity="warn"
+          outlined
+          size="small"
+          :loading="updatingLesson === activeLesson.id"
+          @click="setLessonStatus(activeLesson!, 'in_progress')"
+        />
+        <Button
+          v-if="activeLesson.status !== 'completed'"
+          label="Terminer la leçon"
+          icon="pi pi-check-circle"
+          severity="success"
+          size="small"
+          :loading="updatingLesson === activeLesson.id"
+          @click="setLessonStatus(activeLesson!, 'completed')"
+        />
+        <Button
+          v-if="activeLesson.status !== 'not_started'"
+          label="Réinitialiser"
+          icon="pi pi-refresh"
+          severity="secondary"
+          text
+          size="small"
+          :loading="updatingLesson === activeLesson.id"
+          @click="setLessonStatus(activeLesson!, 'not_started')"
+        />
+      </div>
+    </template>
+  </Dialog>
 </template>
 
 <style scoped>
@@ -682,4 +762,67 @@ const STATUS_LABELS: Record<string, string> = {
 
 /* Sections */
 .milestones-section, .modules-section, .others-section { gap: 0.5rem; }
+
+/* Dialog leçon */
+.lesson-dialog-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.dialog-duration {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.lesson-dialog-content {
+  min-height: 120px;
+  max-height: 420px;
+  overflow-y: auto;
+  margin-bottom: 1.25rem;
+  padding: 1rem 1.125rem;
+  background: rgba(237, 233, 254, 0.15);
+  border: 1px solid rgba(196, 181, 253, 0.25);
+  border-radius: 12px;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: #1e1b4b;
+}
+
+.lesson-content-body :deep(h1),
+.lesson-content-body :deep(h2),
+.lesson-content-body :deep(h3) {
+  color: #4c1d95;
+  margin-top: 1em;
+}
+
+.lesson-content-body :deep(pre),
+.lesson-content-body :deep(code) {
+  background: rgba(0,0,0,0.05);
+  border-radius: 6px;
+  padding: 0.15em 0.4em;
+  font-size: 0.875em;
+}
+
+.lesson-no-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.lesson-dialog-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(196, 181, 253, 0.2);
+}
 </style>

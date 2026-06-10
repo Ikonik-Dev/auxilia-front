@@ -4,11 +4,11 @@ import {
   apiEvaluationSubmissionsGetCollection,
   apiEvaluationSubmissionsIdgradePatch,
 } from '@/api'
-import type { EvaluationEvaluationRead, EvaluationSubmissionSubmissionRead } from '@/api'
+import type { EvaluationEvaluationRead, EvaluationSubmissionSubmissionReadUserSummary } from '@/api'
 
 export function useEvaluations() {
   const evaluations = ref<EvaluationEvaluationRead[]>([])
-  const submissions = ref<EvaluationSubmissionSubmissionRead[]>([])
+  const submissions = ref<EvaluationSubmissionSubmissionReadUserSummary[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -39,13 +39,13 @@ export function useEvaluations() {
     id: number,
     score: string,
     feedback: string,
-  ): Promise<EvaluationSubmissionSubmissionRead> {
+  ): Promise<EvaluationSubmissionSubmissionReadUserSummary> {
     const { data, error: apiError } = await apiEvaluationSubmissionsIdgradePatch({
       path: { id: String(id) },
       body: { score, feedback },
     })
     if (apiError || !data) throw new Error('Impossible d\'enregistrer la note.')
-    return data as unknown as EvaluationSubmissionSubmissionRead
+    return data as unknown as EvaluationSubmissionSubmissionReadUserSummary
   }
 
   return {

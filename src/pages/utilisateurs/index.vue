@@ -22,9 +22,11 @@ const { utilisateurs, loading, error, fetchUtilisateurs, createUser, updateUser,
 
 const canWrite = computed(() => auth.hasRole('ROLE_ADMIN') || auth.hasRole('ROLE_DIRECTEUR'))
 
+const isAdmin = computed(() => auth.hasRole('ROLE_ADMIN'))
+
 onMounted(() => {
   document.title = 'Utilisateurs — Auxilium'
-  fetchUtilisateurs()
+  if (isAdmin.value) fetchUtilisateurs()
 })
 
 // ── Filtres ──
@@ -152,7 +154,13 @@ async function handleDelete() {
 </script>
 
 <template>
-  <div class="utilisateurs-page" :aria-busy="loading ? 'true' : undefined">
+  <div v-if="!isAdmin" class="access-denied" role="alert">
+    <i class="pi pi-lock access-denied-icon" aria-hidden="true" />
+    <h2>Accès réservé à l'administration</h2>
+    <p>Cette page n'est accessible qu'aux administrateurs.</p>
+  </div>
+
+  <div v-else class="utilisateurs-page" :aria-busy="loading ? 'true' : undefined">
     <Toast />
 
     <div class="page-header">
@@ -317,6 +325,20 @@ async function handleDelete() {
 </template>
 
 <style scoped>
+.access-denied {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-height: 300px;
+  color: #675c9c;
+  text-align: center;
+}
+.access-denied-icon { font-size: 3rem; opacity: 0.3; }
+.access-denied h2 { margin: 0; font-size: 1.2rem; color: #4c1d95; }
+.access-denied p { margin: 0; font-size: 0.9rem; }
+
 .utilisateurs-page {
   display: flex;
   flex-direction: column;

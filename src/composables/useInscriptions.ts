@@ -5,10 +5,10 @@ import {
   apiEnrollmentsIdPut,
   apiEnrollmentsIdDelete,
 } from '@/api'
-import type { EnrollmentEnrollmentRead, EnrollmentEnrollmentWrite } from '@/api'
+import type { EnrollmentEnrollmentReadUserSummary, EnrollmentEnrollmentWrite } from '@/api'
 
 export function useInscriptions() {
-  const inscriptions = ref<EnrollmentEnrollmentRead[]>([])
+  const inscriptions = ref<EnrollmentEnrollmentReadUserSummary[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -18,7 +18,7 @@ export function useInscriptions() {
     try {
       const { data, error: apiError } = await apiEnrollmentsGetCollection({ query: { page } })
       if (apiError) error.value = 'Impossible de charger les inscriptions.'
-      else inscriptions.value = data ?? []
+      else inscriptions.value = (data ?? []) as EnrollmentEnrollmentReadUserSummary[]
     } catch {
       error.value = 'Impossible de charger les inscriptions.'
     } finally {
@@ -26,24 +26,24 @@ export function useInscriptions() {
     }
   }
 
-  async function createInscription(payload: EnrollmentEnrollmentWrite): Promise<EnrollmentEnrollmentRead> {
+  async function createInscription(payload: EnrollmentEnrollmentWrite): Promise<EnrollmentEnrollmentReadUserSummary> {
     const { data, error: apiError } = await apiEnrollmentsPost({ body: payload })
     if (apiError || !data) {
       const status = (apiError as { status?: number } | null)?.status
       if (status === 422) throw new Error('422')
       throw new Error('Impossible de créer l\'inscription.')
     }
-    return data
+    return data as EnrollmentEnrollmentReadUserSummary
   }
 
-  async function validateInscription(enrollment: EnrollmentEnrollmentRead): Promise<EnrollmentEnrollmentRead> {
+  async function validateInscription(enrollment: EnrollmentEnrollmentReadUserSummary): Promise<EnrollmentEnrollmentReadUserSummary> {
     const { data, error: apiError } = await apiEnrollmentsIdPut({
       path: { id: String(enrollment.id) },
       body: {
         status: 'active',
         progressPercentage: enrollment.progressPercentage,
         certificateIssued: enrollment.certificateIssued,
-        user: enrollment.user,
+        user: `/api/users/${enrollment.user.id}`,
         session: `/api/sessions/${enrollment.session.id}`,
         enrollmentDate: enrollment.enrollmentDate ?? null,
         startDate: new Date().toISOString(),
@@ -56,7 +56,7 @@ export function useInscriptions() {
       if (status === 422) throw new Error('422')
       throw new Error('Impossible de valider l\'inscription.')
     }
-    return data
+    return data as EnrollmentEnrollmentReadUserSummary
   }
 
   async function deleteInscription(id: number): Promise<boolean> {

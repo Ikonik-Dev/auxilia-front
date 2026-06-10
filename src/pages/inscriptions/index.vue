@@ -3,8 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useInscriptions } from '@/composables/useInscriptions'
 import EnrollmentForm from '@/components/inscriptions/EnrollmentForm.vue'
-import { apiUsersGetCollection } from '@/api'
-import type { EnrollmentEnrollmentRead, EnrollmentEnrollmentWrite, UserUserRead } from '@/api'
+import type { EnrollmentEnrollmentReadUserSummaryUserSummary, EnrollmentEnrollmentWrite } from '@/api'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import InputText from 'primevue/inputtext'
@@ -26,26 +25,13 @@ const canWrite = computed(() =>
   auth.hasRole('ROLE_ADMIN') || auth.hasRole('ROLE_DIRECTEUR') || auth.hasRole('ROLE_RESPONSABLE_PED'),
 )
 
-// ── User lookup map (IRI → fullName) ──
-const userMap = ref(new Map<string, string>())
-
-async function loadUsers() {
-  const { data } = await apiUsersGetCollection()
-  const map = new Map<string, string>()
-  for (const u of data ?? []) {
-    if (u.id) map.set(`/api/users/${u.id}`, `${u.firstName} ${u.lastName}`)
-  }
-  userMap.value = map
-}
-
-function getUserName(iri: string): string {
-  return userMap.value.get(iri) ?? `#${iri.split('/').pop()}`
+function getUserName(user: { firstName: string; lastName: string }): string {
+  return `${user.firstName} ${user.lastName}`
 }
 
 onMounted(() => {
   document.title = 'Inscriptions — Auxilium'
   fetchInscriptions()
-  loadUsers()
 })
 
 // ── Filtres ──
@@ -103,7 +89,7 @@ function progressValue(raw: string): number {
 // ── Valider une inscription pending ──
 const validating = ref<number | null>(null)
 
-async function handleValidate(enrollment: EnrollmentEnrollmentRead) {
+async function handleValidate(enrollment: EnrollmentEnrollmentReadUserSummary) {
   if (!enrollment.id) return
   validating.value = enrollment.id
   try {
@@ -143,10 +129,10 @@ async function handleCreate(payload: EnrollmentEnrollmentWrite) {
 
 // ── Dialog suppression ──
 const showDelete  = ref(false)
-const deleteTarget = ref<EnrollmentEnrollmentRead | null>(null)
+const deleteTarget = ref<EnrollmentEnrollmentReadUserSummary | null>(null)
 const deleting    = ref(false)
 
-function openDelete(enrollment: EnrollmentEnrollmentRead) {
+function openDelete(enrollment: EnrollmentEnrollmentReadUserSummary) {
   deleteTarget.value = enrollment
   showDelete.value = true
 }

@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useMessages } from '@/composables/useMessages'
 import { apiUsersGetCollection } from '@/api'
-import type { MessageMessageRead } from '@/api'
+import type { MessageMessageReadUserSummary } from '@/api'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
@@ -21,10 +21,10 @@ onMounted(() => {
 })
 
 // ── Sélection thread ──
-const selectedThread = ref<MessageMessageRead | null>(null)
+const selectedThread = ref<MessageMessageReadUserSummary | null>(null)
 const replies = computed(() => selectedThread.value ? repliesOf(selectedThread.value.id) : [])
 
-function selectThread(t: MessageMessageRead) {
+function selectThread(t: MessageMessageReadUserSummary) {
   selectedThread.value = t
   replyContent.value = ''
   showReply.value = false
@@ -53,9 +53,9 @@ function formatDateFull(iso: string | null | undefined): string {
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-function getInitials(iri: string | null | undefined): string {
-  const name = getUserName(iri)
-  if (name.startsWith('#')) return '?'
+function getInitials(user: { firstName?: string; lastName?: string } | string | null | undefined): string {
+  const name = getUserName(user)
+  if (name === '—') return '?'
   return name.split(' ').map((n) => n[0] ?? '').join('').toUpperCase().slice(0, 2)
 }
 
@@ -66,16 +66,16 @@ const sendingReply = ref(false)
 
 async function handleReply() {
   if (!replyContent.value.trim() || !selectedThread.value) return
-  const senderIri    = selectedThread.value.sender
-  const recipientIri = senderIri ?? selectedThread.value.sender
-  if (!recipientIri) return
+  const sender = selectedThread.value.sender
+  if (!sender?.id) return
+  const recipientIri = `/api/users/${sender.id}`
 
   sendingReply.value = true
   try {
     await sendMessage({
       subject:      `Re: ${selectedThread.value.subject}`,
       content:      replyContent.value.trim(),
-      recipientIri: String(recipientIri),
+      recipientIri,
       parentIri:    `/api/messages/${selectedThread.value.id}`,
     })
     replyContent.value = ''

@@ -1,10 +1,9 @@
 import { computed, ref } from 'vue'
-import { apiMessagesGetCollection, apiMessagesPost, apiUsersGetCollection } from '@/api'
-import type { MessageMessageRead } from '@/api'
+import { apiMessagesGetCollection, apiMessagesPost } from '@/api'
+import type { MessageMessageReadUserSummary } from '@/api'
 
 export function useMessages() {
-  const messages = ref<MessageMessageRead[]>([])
-  const userMap  = ref(new Map<string, string>())
+  const messages = ref<MessageMessageReadUserSummary[]>([])
   const loading  = ref(false)
   const error    = ref<string | null>(null)
 
@@ -15,7 +14,7 @@ export function useMessages() {
 
   const unreadCount = computed(() => messages.value.filter((m) => !m.isRead && !m.parent).length)
 
-  function repliesOf(threadId: number | undefined): MessageMessageRead[] {
+  function repliesOf(threadId: number | undefined): MessageMessageReadUserSummary[] {
     if (!threadId) return []
     return messages.value.filter((m) => {
       if (!m.parent) return false
@@ -26,27 +25,19 @@ export function useMessages() {
     })
   }
 
-  function getUserName(iri: string | null | undefined): string {
-    if (!iri) return '—'
-    return userMap.value.get(iri) ?? `#${iri.split('/').pop()}`
+  function getUserName(user: { firstName?: string; lastName?: string } | string | null | undefined): string {
+    if (!user) return '—'
+    if (typeof user === 'object') return `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || '—'
+    return `#${user.split('/').pop()}`
   }
 
   async function fetchMessages(page = 1) {
     loading.value = true
     error.value   = null
     try {
-      const [msgRes, usrRes] = await Promise.all([
-        apiMessagesGetCollection({ query: { page } }),
-        apiUsersGetCollection(),
-      ])
-      if (msgRes.error) error.value = 'Impossible de charger les messages.'
-      else messages.value = msgRes.data ?? []
-
-      const map = new Map<string, string>()
-      for (const u of usrRes.data ?? []) {
-        if (u.id) map.set(`/api/users/${u.id}`, `${u.firstName} ${u.lastName}`)
-      }
-      userMap.value = map
+      const res = await apiMessagesGetCollection({ query: { page } })
+      if (res.error) error.value = 'Impossible de charger les messages.'
+      else messages.value = res.data ?? []
     } catch {
       error.value = 'Impossible de charger les messages.'
     } finally {
@@ -59,7 +50,7 @@ export function useMessages() {
     content: string
     recipientIri: string
     parentIri?: string
-  }): Promise<MessageMessageRead> {
+  }): Promise<MessageMessageReadUserSummary> {
     const body = {
       subject:   payload.subject,
       content:   payload.content,
@@ -71,8 +62,8 @@ export function useMessages() {
 
     const { data, error: apiError } = await apiMessagesPost({ body: body as never })
     if (apiError || !data) throw new Error('Impossible d\'envoyer le message.')
-    messages.value.push(data)
-    return data
+    messages.value.push(data as MessageMessageReadUserSummary)
+    return data as MessageMessageReadUserSummary
   }
 
   return { messages, threads, unreadCount, loading, error, fetchMessages, repliesOf, getUserName, sendMessage }

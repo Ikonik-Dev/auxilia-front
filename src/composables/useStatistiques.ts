@@ -4,20 +4,18 @@ import {
   apiUserStatisticsGetCollection,
   apiFormationFeedbacksGetCollection,
   apiFormationsGetCollection,
-  apiUsersGetCollection,
 } from '@/api'
 import type {
   FormationStatisticFormationStatRead,
-  UserStatisticUserStatisticRead,
-  FormationFeedbackFeedbackRead,
+  UserStatisticUserStatisticReadUserSummary,
+  FormationFeedbackFeedbackReadUserSummary,
 } from '@/api'
 
 export function useStatistiques() {
   const formationStats = ref<FormationStatisticFormationStatRead[]>([])
-  const userStats      = ref<UserStatisticUserStatisticRead[]>([])
-  const feedbacks      = ref<FormationFeedbackFeedbackRead[]>([])
+  const userStats      = ref<UserStatisticUserStatisticReadUserSummary[]>([])
+  const feedbacks      = ref<FormationFeedbackFeedbackReadUserSummary[]>([])
   const formationMap   = ref(new Map<string, string>())  // IRI → title
-  const userMap        = ref(new Map<string, string>())  // IRI → fullName
   const loading = ref(false)
   const error   = ref<string | null>(null)
 
@@ -25,9 +23,10 @@ export function useStatistiques() {
     return formationMap.value.get(iri) ?? `#${iri.split('/').pop()}`
   }
 
-  function getUserName(iri: string | null | undefined): string {
-    if (!iri) return '—'
-    return userMap.value.get(iri) ?? `#${iri.split('/').pop()}`
+  function getUserName(user: { firstName?: string; lastName?: string } | string | null | undefined): string {
+    if (!user) return '—'
+    if (typeof user === 'object') return `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || '—'
+    return `#${user.split('/').pop()}`
   }
 
   // ── KPI Formations ──
@@ -76,7 +75,7 @@ export function useStatistiques() {
   // ── Satisfaction breakdown (bar chart) ──
   const satisfactionBreakdown = computed(() => {
     const fb = feedbacks.value
-    const avg = (key: keyof FormationFeedbackFeedbackRead): number => {
+    const avg = (key: keyof FormationFeedbackFeedbackReadUserSummary): number => {
       const vals = fb.filter((f) => f[key] !== null && f[key] !== undefined)
       if (!vals.length) return 0
       return Math.round(vals.reduce((acc, f) => acc + Number(f[key] ?? 0), 0) / vals.length * 10) / 10
@@ -94,27 +93,21 @@ export function useStatistiques() {
     loading.value = true
     error.value   = null
     try {
-      const [fsRes, usRes, fbRes, fmRes, urRes] = await Promise.all([
+      const [fsRes, usRes, fbRes, fmRes] = await Promise.all([
         apiFormationStatisticsGetCollection({ query: { page: 1 } }),
         apiUserStatisticsGetCollection({ query: { page: 1 } }),
         apiFormationFeedbacksGetCollection({ query: { page: 1 } }),
         apiFormationsGetCollection(),
-        apiUsersGetCollection(),
       ])
 
       if (fsRes.error && usRes.error) error.value = 'Impossible de charger les statistiques.'
-      // Garde contre un objet Hydra retourné au lieu d'un tableau
       formationStats.value = Array.isArray(fsRes.data) ? fsRes.data : []
-      userStats.value      = Array.isArray(usRes.data) ? usRes.data : []
-      feedbacks.value      = Array.isArray(fbRes.data) ? fbRes.data : []
+      userStats.value      = Array.isArray(usRes.data) ? (usRes.data as UserStatisticUserStatisticReadUserSummary[]) : []
+      feedbacks.value      = Array.isArray(fbRes.data) ? (fbRes.data as FormationFeedbackFeedbackReadUserSummary[]) : []
 
       const fMap = new Map<string, string>()
       for (const f of fmRes.data ?? []) if (f.id) fMap.set(`/api/formations/${f.id}`, f.title)
       formationMap.value = fMap
-
-      const uMap = new Map<string, string>()
-      for (const u of urRes.data ?? []) if (u.id) uMap.set(`/api/users/${u.id}`, `${u.firstName} ${u.lastName}`)
-      userMap.value = uMap
     } catch {
       error.value = 'Impossible de charger les statistiques.'
     } finally {

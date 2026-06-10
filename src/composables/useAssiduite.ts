@@ -6,19 +6,20 @@ import {
   apiAttendancesPost,
   apiAttendancesIdPut,
 } from '@/api'
-import type { ScheduleScheduleRead, AttendanceAttendanceRead, EnrollmentEnrollmentRead } from '@/api'
+import type { ScheduleScheduleReadUserSummary, AttendanceAttendanceRead, EnrollmentEnrollmentReadUserSummary } from '@/api'
 
 export interface Participant {
   userIri: string
+  fullName: string
   attendanceId?: number
   savedStatus?: string
 }
 
 export function useAssiduite() {
-  const schedules    = ref<ScheduleScheduleRead[]>([])
+  const schedules    = ref<ScheduleScheduleReadUserSummary[]>([])
   const attendances  = ref<AttendanceAttendanceRead[]>([])
-  const enrollments  = ref<EnrollmentEnrollmentRead[]>([])
-  const selectedSchedule = ref<ScheduleScheduleRead | null>(null)
+  const enrollments  = ref<EnrollmentEnrollmentReadUserSummary[]>([])
+  const selectedSchedule = ref<ScheduleScheduleReadUserSummary | null>(null)
   const loading             = ref(false)
   const loadingAttendances  = ref(false)
   const error               = ref<string | null>(null)
@@ -33,11 +34,13 @@ export function useAssiduite() {
     return enrollments.value
       .filter((e) => e.session.id === sessionId && e.status === 'active')
       .map((e) => {
+        const userIri  = `/api/users/${e.user.id}`
         const existing = attendances.value.find(
-          (a) => a.user === e.user && a.schedule === scheduleIri,
+          (a) => a.user === userIri && a.schedule === scheduleIri,
         )
         return {
-          userIri:      e.user,
+          userIri,
+          fullName:     `${e.user.firstName} ${e.user.lastName}`.trim(),
           attendanceId: existing?.id,
           savedStatus:  existing?.status,
         }

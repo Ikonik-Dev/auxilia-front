@@ -23,6 +23,7 @@ export interface LessonRow {
   orderIndex: number
   lessonType: string | null
   durationMinutes: number | null
+  content: string | null
   completionId?: number
   status: 'not_started' | 'in_progress' | 'completed'
   progressPct: number
@@ -90,18 +91,21 @@ export function useParcours() {
       const formationIri  = `/api/formations/${formationId}`
       const enrollmentIri = `/api/enrollments/${enrollment.id}`
 
-      // Chargement parallèle
+      // Chargement parallèle avec filtres serveur pour éviter les problèmes de pagination
       const [modRes, lesRes, compRes, parRes, milRes] = await Promise.all([
-        apiModulesGetCollection({ query: { page: 1 } }),
-        apiLessonsGetCollection({ query: { page: 1 } }),
-        apiLessonCompletionsGetCollection({ query: { page: 1 } }),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        apiModulesGetCollection({ query: { formation: formationIri } as any }),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        apiLessonsGetCollection({ query: { 'module.formation': formationIri } as any }),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        apiLessonCompletionsGetCollection({ query: { enrollment: enrollmentIri } as any }),
         apiParcoursGetCollection({ query: { page: 1 } }),
         apiMilestonesGetCollection({ query: { page: 1 } }),
       ])
 
-      const allModules     = (modRes.data ?? []).filter((m) => m.formation === formationIri)
+      const allModules     = modRes.data ?? []
       const allLessons     = lesRes.data ?? []
-      const allCompletions = (compRes.data ?? []).filter((c) => c.enrollment === enrollmentIri)
+      const allCompletions = compRes.data ?? []
       completions.value    = allCompletions
 
       // Parcours de cet enrollment
@@ -129,14 +133,15 @@ export function useParcours() {
             const comp = allCompletions.find((c) => c.lesson === lessonIri)
             const status = (comp?.status ?? 'not_started') as LessonRow['status']
             return {
-              id:             l.id!,
-              title:          l.title,
-              orderIndex:     l.orderIndex,
-              lessonType:     l.lessonType ?? null,
+              id:              l.id!,
+              title:           l.title,
+              orderIndex:      l.orderIndex,
+              lessonType:      l.lessonType ?? null,
               durationMinutes: l.durationMinutes ?? null,
-              completionId:   comp?.id,
+              content:         l.content ?? null,
+              completionId:    comp?.id,
               status,
-              progressPct:    parseFloat(comp?.progressPercentage ?? '0'),
+              progressPct:     parseFloat(comp?.progressPercentage ?? '0'),
             }
           })
 
