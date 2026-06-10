@@ -13,6 +13,17 @@ interface NavItem {
   icon: string
   to: string
   roles?: string[]
+  primaryOnly?: boolean
+}
+
+// Ordre décroissant de priorité dans la hiérarchie des rôles
+const ROLE_PRIORITY = ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_RESPONSABLE_PED', 'ROLE_FORMATEUR', 'ROLE_USER']
+
+function primaryRole(): string {
+  for (const role of ROLE_PRIORITY) {
+    if (auth.hasRole(role)) return role
+  }
+  return 'ROLE_USER'
 }
 
 const allNavItems: NavItem[] = [
@@ -23,17 +34,19 @@ const allNavItems: NavItem[] = [
   { label: 'Évaluations',     icon: 'pi pi-check-circle',    to: '/evaluations',   roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_FORMATEUR'] },
   { label: 'Assiduité',       icon: 'pi pi-calendar-clock',  to: '/assiduite',     roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_FORMATEUR'] },
   { label: 'Statistiques',    icon: 'pi pi-chart-bar',       to: '/statistiques',  roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_RESPONSABLE_PED'] },
-  { label: 'Mon Parcours',    icon: 'pi pi-map',             to: '/parcours',      roles: ['ROLE_USER'] },
-  { label: 'Mes Documents',   icon: 'pi pi-file',            to: '/documents',     roles: ['ROLE_USER'] },
+  { label: 'Mon Parcours',    icon: 'pi pi-map',             to: '/parcours',      roles: ['ROLE_USER'], primaryOnly: true },
+  { label: 'Mes Documents',   icon: 'pi pi-file',            to: '/documents',     roles: ['ROLE_USER'], primaryOnly: true },
   { label: 'Messages',        icon: 'pi pi-envelope',        to: '/messages',      roles: [] },
 ]
 
-const navItems = computed<NavItem[]>(() =>
-  allNavItems.filter((item) => {
+const navItems = computed<NavItem[]>(() => {
+  const primary = primaryRole()
+  return allNavItems.filter((item) => {
     if (!item.roles || item.roles.length === 0) return true
+    if (item.primaryOnly) return item.roles.includes(primary)
     return item.roles.some((role) => auth.hasRole(role))
-  }),
-)
+  })
+})
 
 async function handleLogout() {
   await auth.logout()
