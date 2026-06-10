@@ -14,7 +14,8 @@ const email = ref('')
 const password = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
-const emailInputRef = ref<HTMLInputElement | null>(null)
+// PrimeVue v4: la ref pointe sur l'instance du composant, pas sur l'input natif
+const emailInputRef = ref<InstanceType<typeof InputText> | null>(null)
 
 onMounted(() => {
   document.title = 'Connexion — Auxilium'
@@ -33,7 +34,7 @@ async function handleLogin() {
       ? 'Connexion établie mais impossible de charger le profil. Veuillez réessayer.'
       : 'Email ou mot de passe incorrect.'
     await nextTick()
-    emailInputRef.value?.focus()
+    emailInputRef.value?.$el?.focus()
   } finally {
     loading.value = false
   }
@@ -85,7 +86,7 @@ async function handleLogin() {
         <div class="field">
           <label for="password">Mot de passe</label>
           <Password
-            id="password"
+            inputId="password"
             v-model="password"
             :feedback="false"
             autocomplete="current-password"
