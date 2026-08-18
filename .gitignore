@@ -31,6 +31,12 @@ coverage
 # Generated API client (run `npm run generate:api` after cloning)
 src/api/generated/
 
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
 # Cypress
 /cypress/videos/
 /cypress/screenshots/
