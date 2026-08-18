@@ -11,7 +11,7 @@ import {
   apiMilestonesGetCollection,
 } from '@/api'
 import type {
-  EnrollmentEnrollmentRead,
+  EnrollmentEnrollmentReadUserSummary,
   LessonCompletionLessonCompletionRead,
   MilestoneMilestoneRead,
   ParcoursParcoursRead,
@@ -40,8 +40,8 @@ export interface ModuleRow {
 }
 
 export function useParcours() {
-  const enrollments        = ref<EnrollmentEnrollmentRead[]>([])
-  const selectedEnrollment = ref<EnrollmentEnrollmentRead | null>(null)
+  const enrollments        = ref<EnrollmentEnrollmentReadUserSummary[]>([])
+  const selectedEnrollment = ref<EnrollmentEnrollmentReadUserSummary | null>(null)
   const modules            = ref<ModuleRow[]>([])
   const parcours           = ref<ParcoursParcoursRead | null>(null)
   const milestones         = ref<MilestoneMilestoneRead[]>([])
@@ -51,8 +51,10 @@ export function useParcours() {
   const loadingDetail = ref(false)
   const error         = ref<string | null>(null)
 
+  // Seul 'active' vaut « formation en cours » — cf. CLAUDE.md §7 :
+  // Enrollment.status ∈ { pending, active, completed, abandoned }.
   const activeEnrollments = computed(() =>
-    enrollments.value.filter((e) => e.status === 'active' || e.status === 'in_progress'),
+    enrollments.value.filter((e) => e.status === 'active'),
   )
 
   async function fetchParcours() {
@@ -63,7 +65,7 @@ export function useParcours() {
       if (apiError) { error.value = 'Impossible de charger votre parcours.'; return }
       enrollments.value = data ?? []
       // Auto-sélectionner si un seul enrollment actif
-      const active = enrollments.value.filter((e) => e.status === 'active' || e.status === 'in_progress')
+      const active = activeEnrollments.value
       if (active.length === 1) await selectEnrollment(active[0]!)
     } catch {
       error.value = 'Impossible de charger votre parcours.'
@@ -72,7 +74,7 @@ export function useParcours() {
     }
   }
 
-  async function selectEnrollment(enrollment: EnrollmentEnrollmentRead) {
+  async function selectEnrollment(enrollment: EnrollmentEnrollmentReadUserSummary) {
     selectedEnrollment.value = enrollment
     loadingDetail.value = true
     modules.value    = []

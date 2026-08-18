@@ -3,7 +3,7 @@ import { onMounted, ref, watch } from 'vue'
 import { useParcours } from '@/composables/useParcours'
 import type { LessonRow } from '@/composables/useParcours'
 import MilestonesList from '@/components/parcours/MilestonesList.vue'
-import type { EnrollmentEnrollmentRead } from '@/api'
+import type { EnrollmentEnrollmentReadUserSummary } from '@/api'
 import ProgressBar from 'primevue/progressbar'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
@@ -34,7 +34,7 @@ onMounted(() => {
 })
 
 // ── Sélection enrollment (si plusieurs actifs) ──
-const enrollmentOptions = ref<{ label: string; value: EnrollmentEnrollmentRead }[]>([])
+const enrollmentOptions = ref<{ label: string; value: EnrollmentEnrollmentReadUserSummary }[]>([])
 
 function buildOptions() {
   enrollmentOptions.value = activeEnrollments.value.map((e) => ({

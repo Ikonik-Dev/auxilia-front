@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useEvaluations } from '@/composables/useEvaluations'
-import type { EvaluationSubmissionSubmissionReadUserSummaryUserSummary } from '@/api'
+import type { EvaluationSubmissionSubmissionReadUserSummary } from '@/api'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'

@@ -65,7 +65,7 @@ export function useAssiduite() {
     }
   }
 
-  async function selectSchedule(schedule: ScheduleScheduleRead) {
+  async function selectSchedule(schedule: ScheduleScheduleReadUserSummary) {
     selectedSchedule.value   = schedule
     loadingAttendances.value = true
     try {

@@ -14,8 +14,10 @@ const email = ref('')
 const password = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
-// PrimeVue v4: la ref pointe sur l'instance du composant, pas sur l'input natif
-const emailInputRef = ref<InstanceType<typeof InputText> | null>(null)
+// PrimeVue v4: la ref pointe sur l'instance du composant, pas sur l'input natif.
+// InstanceType<typeof InputText> n'expose pas $el dans ses types — on type la forme
+// réellement consommée ici.
+const emailInputRef = ref<{ $el?: HTMLInputElement } | null>(null)
 
 onMounted(() => {
   document.title = 'Connexion — Auxilium'
