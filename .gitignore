@@ -28,8 +28,12 @@ coverage
 
 .eslintcache
 
-# Generated API client (run `npm run generate:api` after cloning)
-src/api/generated/
+# Le SDK généré (src/api/generated/) est VOLONTAIREMENT versionné.
+# Sans lui dans le dépôt, `npm ci && npm run type-check` est impossible sans une
+# API vivante sur :8080 — donc pas de CI, donc les divergences de contrat passent
+# inaperçues (c'est ce qui a cassé le build en juin 2026).
+# Régénérer avec `npm run generate:api` et RELIRE le diff : il rend visible tout
+# changement de contrat backend.
 
 # Playwright
 /test-results/

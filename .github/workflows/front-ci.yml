@@ -1,0 +1,36 @@
+name: Front CI
+
+# Portes de qualité du frontend — cf. CLAUDE.md §7 (Definition of Done).
+# Playwright n'est volontairement PAS exécuté ici : la suite e2e a besoin du
+# backend Symfony sur :8080 (Docker), hors périmètre d'un runner front.
+# Elle se lance en local : `npm run dev` puis `npm run test:e2e`.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      # Le SDK (src/api/generated/) est versionné : ces trois étapes tournent
+      # sans backend. Si ce n'était plus le cas, la CI ne pourrait plus exister.
+      - name: Type-check (vue-tsc)
+        run: npm run type-check
+
+      - name: Tests unitaires (Vitest)
+        run: npm run test:run
+
+      - name: Build de production
+        run: npm run build-only

@@ -48,7 +48,28 @@ npm run type-check     # vue-tsc --build (sans compiler)
 npm run generate:api   # régénère src/api/generated/ depuis http://localhost:8080/api/docs.json
                        # ⚠ L'API backend doit tourner avant de lancer cette commande
 npm run preview        # preview du build de production
+npm run test:run       # Vitest (tests/unit/**)
+npm run test:e2e       # Playwright (tests/e2e/**) — exige `npm run dev` + le backend Docker
 ```
+
+### Portes de qualité
+
+Il n'y a **pas d'ESLint configuré** (le paquet est en devDependencies mais sans fichier
+de config ni branchement dans `vite.config.ts` — `npm run lint` n'existe pas). Les portes
+sont donc :
+
+| Porte | Commande | Couvre |
+|-------|----------|--------|
+| Types | `npm run type-check` | `src/**` **et** `tests/**` |
+| Unitaire | `npm run test:run` | `tests/unit/**` |
+| Build | `npm run build-only` | bundle de production |
+| E2E | `npm run test:e2e` | `tests/e2e/**`, backend requis |
+
+Les trois premières tournent en CI (`.github/workflows/front-ci.yml`) sur chaque push.
+
+⚠️ `npm run dev` **ne type-checke pas**. Un code qui tourne en dev peut casser le build.
+Toujours lancer `npm run type-check` avant de considérer un chantier terminé — c'est
+l'absence de ce réflexe qui a laissé le build cassé pendant un mois en 2026.
 
 ---
 
@@ -60,6 +81,9 @@ src/
 │   ├── client.ts          # Configuration du client HTTP (@hey-api/client-fetch)
 │   ├── index.ts           # Re-export centralisé
 │   └── generated/         # ⚠ GÉNÉRÉ AUTOMATIQUEMENT — ne jamais modifier manuellement
+│                          #   VERSIONNÉ dans Git (cf. .gitignore) : c'est ce qui rend
+│                          #   la CI possible sans backend. Après generate:api,
+│                          #   RELIRE le diff — il expose les ruptures de contrat.
 │       ├── types.gen.ts   # ~50 types TypeScript (entités backend)
 │       ├── sdk.gen.ts     # Fonctions pour chaque endpoint API
 │       └── client.gen.ts  # Instance client générée
