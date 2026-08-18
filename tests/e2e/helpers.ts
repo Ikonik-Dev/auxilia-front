@@ -11,8 +11,9 @@ export async function loginAs(page: Page, role: keyof typeof DEMO_CREDENTIALS) {
   const { email, password } = DEMO_CREDENTIALS[role]
   await page.goto('/login')
   await page.getByLabel('Email').fill(email)
-  // PrimeVue v4 <Password inputId="password"> place l'id sur l'input interne
-  await page.locator('input[autocomplete="current-password"]').fill(password)
+  // PrimeVue v4 <Password> ne propage pas l'attribut autocomplete sur l'input interne :
+  // on cible le nom accessible, qui vient du <label for="password"> + inputId="password".
+  await page.getByLabel('Mot de passe').fill(password)
   await page.getByRole('button', { name: /se connecter/i }).click()
   // Attend la redirection vers le dashboard
   await page.waitForURL(/\/dashboard/, { timeout: 15_000 })
