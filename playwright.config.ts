@@ -2,7 +2,11 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './tests/e2e',
-  timeout: 30_000,
+  // Un test type = login (~10 s) + chargement d'une page qui enchaîne plusieurs
+  // requêtes vers l'API Docker (~10-20 s sur Windows). 30 s était trop juste et
+  // rendait la suite intermittente.
+  timeout: 90_000,
+  expect: { timeout: 30_000 },
   retries: 0,
   reporter: 'list',
   use: {
