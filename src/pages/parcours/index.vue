@@ -17,12 +17,14 @@ const toast = useToast()
 const {
   enrollments,
   activeEnrollments,
+  inactiveEnrollments,
   selectedEnrollment,
   modules,
   milestones,
   loading,
   loadingDetail,
   error,
+  detailError,
   fetchParcours,
   selectEnrollment,
   updateLessonStatus,
@@ -207,8 +209,13 @@ const STATUS_LABELS: Record<string, string> = {
       </div>
 
       <template v-else-if="selectedEnrollment">
+        <!-- Échec de chargement du détail : n'efface pas le reste de la page -->
+        <div v-if="detailError" role="alert" aria-live="polite" class="dash-error">
+          <i class="pi pi-exclamation-triangle" /> {{ detailError }}
+        </div>
+
         <!-- Arborescence modules / leçons -->
-        <div v-if="modules.length > 0" class="modules-section">
+        <div v-else-if="modules.length > 0" class="modules-section">
           <h2 class="section-heading">Programme</h2>
 
           <div class="modules-list">
@@ -305,7 +312,7 @@ const STATUS_LABELS: Record<string, string> = {
         </div>
 
         <!-- Jalons du parcours -->
-        <div v-if="milestones.length > 0 || true" class="milestones-section">
+        <div v-if="milestones.length > 0" class="milestones-section">
           <h2 class="section-heading">Jalons du parcours</h2>
           <div class="milestones-card">
             <MilestonesList :milestones="milestones" />
@@ -319,12 +326,18 @@ const STATUS_LABELS: Record<string, string> = {
         <p>Sélectionnez une formation ci-dessus pour voir votre programme.</p>
       </div>
 
-      <!-- Autres enrollments (non actifs) si aucun actif -->
-      <div v-if="activeEnrollments.length === 0 && enrollments.length > 0" class="others-section">
+      <!--
+        Historique : inscriptions non actives.
+        Auparavant conditionné à `activeEnrollments.length === 0`, ce qui rendait
+        l'historique invisible dès qu'une formation était en cours — le cas
+        nominal. La boucle portait en outre sur `enrollments` entier, ce qui
+        aurait dupliqué l'inscription active dans « Historique ».
+      -->
+      <div v-if="inactiveEnrollments.length > 0" class="others-section">
         <h2 class="section-heading">Historique</h2>
         <div class="cards-grid">
           <article
-            v-for="e in enrollments"
+            v-for="e in inactiveEnrollments"
             :key="e.id"
             class="enrollment-card-mini"
           >

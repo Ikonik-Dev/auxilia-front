@@ -116,3 +116,97 @@ describe('useParcours — activeEnrollments', () => {
     expect(selectedEnrollment.value).toBeNull()
   })
 })
+
+describe('useParcours — inactiveEnrollments (historique)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    apiSessionsIdGet.mockResolvedValue({ data: { formation: { id: 1 } } })
+  })
+
+  it("expose l'historique MÊME quand une formation est en cours", async () => {
+    // Régression : la section « Historique » de /parcours était conditionnée à
+    // `activeEnrollments.length === 0`. Un stagiaire ayant 1 `active` +
+    // 1 `completed` — le cas nominal des fixtures — ne voyait jamais sa
+    // formation terminée.
+    apiEnrollmentsGetCollection.mockResolvedValue({
+      data: [makeEnrollment(1, 'completed'), makeEnrollment(2, 'active')],
+      error: undefined,
+    })
+
+    const { inactiveEnrollments, activeEnrollments, fetchParcours } = useParcours()
+    await fetchParcours()
+
+    expect(activeEnrollments.value.map((e) => e.id)).toEqual([2])
+    expect(inactiveEnrollments.value.map((e) => e.id)).toEqual([1])
+  })
+
+  it("n'inclut jamais l'inscription active dans l'historique", async () => {
+    apiEnrollmentsGetCollection.mockResolvedValue({
+      data: [
+        makeEnrollment(1, 'pending'),
+        makeEnrollment(2, 'active'),
+        makeEnrollment(3, 'completed'),
+        makeEnrollment(4, 'abandoned'),
+      ],
+      error: undefined,
+    })
+
+    const { inactiveEnrollments, fetchParcours } = useParcours()
+    await fetchParcours()
+
+    expect(inactiveEnrollments.value.map((e) => e.id)).toEqual([1, 3, 4])
+  })
+})
+
+describe('useParcours — erreurs de détail', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    apiSessionsIdGet.mockResolvedValue({ data: { formation: { id: 1 } } })
+  })
+
+  it('signale explicitement une session sans formation rattachée', async () => {
+    // Auparavant : `return` muet, la page retombait sur « Aucun module
+    // disponible » et masquait la vraie cause.
+    apiSessionsIdGet.mockResolvedValue({ data: { formation: null } })
+    apiEnrollmentsGetCollection.mockResolvedValue({
+      data: [makeEnrollment(1, 'active')],
+      error: undefined,
+    })
+
+    const { detailError, error, selectedEnrollment, fetchParcours } = useParcours()
+    await fetchParcours()
+
+    expect(selectedEnrollment.value?.id).toBe(1)
+    expect(detailError.value).toMatch(/aucune formation/i)
+    // L'erreur de détail ne doit pas masquer la page entière.
+    expect(error.value).toBeNull()
+  })
+
+  it('signale explicitement une inscription sans session', async () => {
+    apiEnrollmentsGetCollection.mockResolvedValue({
+      data: [{ ...makeEnrollment(1, 'active'), session: { id: null, name: 'Sans session' } }],
+      error: undefined,
+    })
+
+    const { detailError, error, fetchParcours } = useParcours()
+    await fetchParcours()
+
+    expect(detailError.value).toMatch(/aucune session/i)
+    expect(error.value).toBeNull()
+  })
+
+  it("un échec de chargement du détail n'efface pas la liste des inscriptions", async () => {
+    apiSessionsIdGet.mockRejectedValue(new Error('réseau'))
+    apiEnrollmentsGetCollection.mockResolvedValue({
+      data: [makeEnrollment(1, 'active'), makeEnrollment(2, 'completed')],
+      error: undefined,
+    })
+
+    const { enrollments, detailError, error, fetchParcours } = useParcours()
+    await fetchParcours()
+
+    expect(detailError.value).toMatch(/détail/i)
+    expect(error.value).toBeNull()
+    expect(enrollments.value).toHaveLength(2)
+  })
+})

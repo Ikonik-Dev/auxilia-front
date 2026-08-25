@@ -50,11 +50,23 @@ export function useParcours() {
   const loading       = ref(false)
   const loadingDetail = ref(false)
   const error         = ref<string | null>(null)
+  // Erreur portant sur le DÉTAIL d'une formation, distincte de `error` qui
+  // masque toute la page. Un détail illisible ne doit pas effacer la liste des
+  // inscriptions déjà chargées.
+  const detailError   = ref<string | null>(null)
 
   // Seul 'active' vaut « formation en cours » — cf. CLAUDE.md §7 :
   // Enrollment.status ∈ { pending, active, completed, abandoned }.
   const activeEnrollments = computed(() =>
     enrollments.value.filter((e) => e.status === 'active'),
+  )
+
+  // Inscriptions terminées / abandonnées / en attente. Elles constituent
+  // l'historique, qui doit rester consultable même quand une formation est en
+  // cours — sinon un stagiaire ayant 1 `active` + 1 `completed` ne voit jamais
+  // sa formation terminée.
+  const inactiveEnrollments = computed(() =>
+    enrollments.value.filter((e) => e.status !== 'active'),
   )
 
   async function fetchParcours() {
@@ -77,6 +89,7 @@ export function useParcours() {
   async function selectEnrollment(enrollment: EnrollmentEnrollmentReadUserSummary) {
     selectedEnrollment.value = enrollment
     loadingDetail.value = true
+    detailError.value = null
     modules.value    = []
     parcours.value   = null
     milestones.value = []
@@ -84,12 +97,20 @@ export function useParcours() {
 
     try {
       const sessionId = enrollment.session.id
-      if (!sessionId) return
+      if (!sessionId) {
+        // Sortie muette auparavant : la page retombait sur « Aucun module
+        // disponible », qui ment sur la cause réelle.
+        detailError.value = 'Cette inscription n\'est rattachée à aucune session : le programme ne peut pas être affiché.'
+        return
+      }
 
       // Récupère la session pour obtenir le formation ID
       const sessionRes = await apiSessionsIdGet({ path: { id: String(sessionId) } })
       const formationId = sessionRes.data?.formation?.id
-      if (!formationId) return
+      if (!formationId) {
+        detailError.value = 'La session de cette inscription n\'est rattachée à aucune formation : le programme ne peut pas être affiché.'
+        return
+      }
       const formationIri  = `/api/formations/${formationId}`
       const enrollmentIri = `/api/enrollments/${enrollment.id}`
 
@@ -163,7 +184,9 @@ export function useParcours() {
         }
       })
     } catch {
-      error.value = 'Impossible de charger le détail de votre formation.'
+      // `detailError` et non `error` : l'échec porte sur une formation, pas sur
+      // la page. La liste des inscriptions reste affichée.
+      detailError.value = 'Impossible de charger le détail de votre formation.'
     } finally {
       loadingDetail.value = false
     }
@@ -217,6 +240,7 @@ export function useParcours() {
   return {
     enrollments,
     activeEnrollments,
+    inactiveEnrollments,
     selectedEnrollment,
     modules,
     parcours,
@@ -224,6 +248,7 @@ export function useParcours() {
     loading,
     loadingDetail,
     error,
+    detailError,
     fetchParcours,
     selectEnrollment,
     updateLessonStatus,
