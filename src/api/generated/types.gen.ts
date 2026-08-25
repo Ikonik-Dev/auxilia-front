@@ -266,7 +266,6 @@ export type DocumentDownloadDocumentDownloadRead = {
 
 export type DocumentDownloadDocumentDownloadWrite = {
     document: string;
-    downloadedBy?: string | null;
 };
 
 export type DocumentDownloadJsonldDocumentDownloadRead = HydraItemBaseSchema & {
@@ -451,9 +450,7 @@ export type EvaluationSubmissionSubmissionWrite = {
     gradedAt?: string | null;
     feedback?: string | null;
     evaluation: string;
-    user?: string | null;
     enrollment: string;
-    gradedBy?: string | null;
 };
 
 export type EvaluationSubmissionSubmissionWriteJsonMergePatch = {
@@ -467,9 +464,7 @@ export type EvaluationSubmissionSubmissionWriteJsonMergePatch = {
     gradedAt?: string | null;
     feedback?: string | null;
     evaluation?: string;
-    user?: string | null;
     enrollment?: string;
-    gradedBy?: string | null;
 };
 
 export type EvaluationSubmissionManualGradeInputSubmissionWriteJsonMergePatch = {
@@ -802,7 +797,6 @@ export type LessonCompletionLessonCompletionWrite = {
     lastAccessedAt?: string | null;
     lesson: string;
     enrollment: string;
-    user?: string | null;
 };
 
 export type LessonCompletionJsonldLessonCompletionRead = HydraItemBaseSchema & {
@@ -885,7 +879,6 @@ export type MediaViewMediaViewWrite = {
     completed: boolean;
     viewedAt?: string | null;
     media: string;
-    user?: string | null;
 };
 
 export type MediaViewJsonldMediaViewRead = HydraItemBaseSchema & {
@@ -1229,6 +1222,13 @@ export type ResponseResponseRead = {
 };
 
 export type ResponseResponseWrite = {
+    answerText?: string | null;
+    submission: string;
+    question: string;
+    answer?: string | null;
+};
+
+export type ResponseResponseWriteResponseGrade = {
     answerText?: string | null;
     isCorrect?: boolean | null;
     pointsEarned: string;
@@ -6277,7 +6277,7 @@ export type ApiResponsesIdPutData = {
     /**
      * The updated Response resource
      */
-    body: ResponseResponseWrite;
+    body: ResponseResponseWriteResponseGrade;
     path: {
         /**
          * Response identifier
