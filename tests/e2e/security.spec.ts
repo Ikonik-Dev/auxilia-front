@@ -75,12 +75,20 @@ test.describe('Sécurité — LessonCompletion ownership', () => {
       },
     })
 
-    // Doit être refusé. Un 201 signifierait qu'un stagiaire peut valider les
-    // leçons d'un autre — fuite cross-tenant.
+    // Doit être refusé — et refusé POUR LA BONNE RAISON. Accepter 404/422 en plus
+    // de 403 rendait ce test complaisant : un 422 de validation (champ manquant,
+    // leçon hors formation, contrainte d'unicité) l'aurait fait passer alors même
+    // qu'aucun contrôle d'ownership n'existerait. On exige donc 403 et on vérifie
+    // le motif renvoyé par LessonCompletionStateProcessor.
+    const corps = await postRes.text()
     expect(
-      [403, 404, 422],
-      `POST accepté avec le statut ${postRes.status()} — ownership non vérifié côté API`,
-    ).toContain(postRes.status())
+      postRes.status(),
+      `POST /api/lesson_completions sur l'inscription #${foreign.id} d'autrui — corps : ${corps}`,
+    ).toBe(403)
+    expect(
+      corps,
+      'refus obtenu, mais pas pour un motif de propriété',
+    ).toContain('autre stagiaire')
 
     await stgCtx.close()
   })

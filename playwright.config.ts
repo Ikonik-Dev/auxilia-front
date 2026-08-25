@@ -8,6 +8,12 @@ export default defineConfig({
   timeout: 90_000,
   expect: { timeout: 30_000 },
   retries: 0,
+  // Sérialisé volontairement. À 3 workers, la suite saturait l'API Docker sur
+  // Windows : le POST de login restait en attente au-delà de 15 s et une dizaine
+  // de tests échouaient en cascade, avec des symptômes qui ressemblaient à des
+  // bugs applicatifs. Le goulot est le backend, pas le navigateur — paralléliser
+  // ne fait donc rien gagner ici.
+  workers: 1,
   reporter: 'list',
   use: {
     baseURL: 'http://localhost:5173',

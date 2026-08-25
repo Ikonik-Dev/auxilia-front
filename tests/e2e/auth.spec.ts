@@ -3,7 +3,9 @@ import { loginAs } from './helpers'
 
 test.describe('Authentification', () => {
   test('login stagiaire → cookie BEARER posé + redirect dashboard', async ({ page }) => {
-    await loginAs(page, 'stagiaire')
+    // `forceLogin` : ce test porte sur le mécanisme de connexion, il doit passer
+    // par le formulaire même si une session est déjà en cache pour ce worker.
+    await loginAs(page, 'stagiaire', { forceLogin: true })
 
     // Le localStorage ne doit pas contenir de token JWT
     const ls = await page.evaluate(() => JSON.stringify(localStorage))
