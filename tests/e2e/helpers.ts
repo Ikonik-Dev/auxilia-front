@@ -8,6 +8,9 @@ export const DEMO_CREDENTIALS = {
   // Profil sans aucune inscription active (1 seule inscription, `completed`) :
   // c'est le cas qui a opposé les audits sur l'écran vide de /parcours.
   stagiaire3:  { email: 'stagiaire3@auxilium.test',  password: 'Test1234!' },
+  // Seul compte ROLE_ADMIN du jeu de démonstration : le seul pour lequel
+  // /utilisateurs s'affiche au lieu de l'écran « Accès réservé ».
+  superviseur: { email: 'superviseur@auxilium.test', password: 'Test1234!' },
 }
 
 export type Role = keyof typeof DEMO_CREDENTIALS

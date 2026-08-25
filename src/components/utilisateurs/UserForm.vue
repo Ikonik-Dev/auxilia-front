@@ -15,7 +15,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  submit: [payload: UserFormPayload & { password?: string }]
+  submit: [payload: UserFormPayload]
   cancel: []
 }>()
 
@@ -69,7 +69,7 @@ function validate(): boolean {
 
 function handleSubmit() {
   if (!validate()) return
-  const payload: UserFormPayload & { password?: string } = {
+  const payload: UserFormPayload = {
     firstName: firstName.value.trim(),
     lastName:  lastName.value.trim(),
     email:     email.value.trim(),
@@ -77,7 +77,10 @@ function handleSubmit() {
     isActive:  isActive.value,
     roles:     roles.value,
   }
-  if (password.value) payload.password = password.value
+  // Champ laissé vide en édition => clé absente => mot de passe conservé côté serveur.
+  // Le label « laisser vide pour conserver » ne devient exact qu'avec `plainPassword`
+  // facultatif : jusqu'au 25 août 2026, l'omission déclenchait un 422.
+  if (password.value) payload.plainPassword = password.value
   emit('submit', payload)
 }
 </script>

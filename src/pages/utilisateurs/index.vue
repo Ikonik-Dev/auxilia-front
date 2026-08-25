@@ -107,7 +107,7 @@ function openEdit(user: UserUserRead) {
   showForm.value = true
 }
 
-async function handleSubmit(payload: UserFormPayload & { password?: string }) {
+async function handleSubmit(payload: UserFormPayload) {
   saving.value = true
   saveError.value = null
   try {
@@ -120,8 +120,13 @@ async function handleSubmit(payload: UserFormPayload & { password?: string }) {
     }
     showForm.value = false
     await fetchUtilisateurs()
-  } catch {
-    saveError.value = 'Une erreur est survenue. Vérifiez les données et réessayez.'
+  } catch (erreur) {
+    // Le composable remonte le motif réel (violation de validation, refus de droits).
+    // Un message générique rendait un email déjà pris indiscernable d'un 403.
+    saveError.value =
+      erreur instanceof Error && erreur.message !== ''
+        ? erreur.message
+        : 'Une erreur est survenue. Vérifiez les données et réessayez.'
   } finally {
     saving.value = false
   }

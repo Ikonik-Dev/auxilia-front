@@ -1415,13 +1415,24 @@ export type UserUserRead = {
 
 export type UserUserWrite = {
     email: string;
-    password: string;
+    plainPassword: string | null;
     roles: Array<string | null>;
     firstName: string;
     lastName: string;
     phone?: string | null;
     avatar?: string | null;
     isActive: boolean;
+};
+
+export type UserUserWriteJsonMergePatch = {
+    email?: string;
+    plainPassword?: string | null;
+    roles?: Array<string | null>;
+    firstName?: string;
+    lastName?: string;
+    phone?: string | null;
+    avatar?: string | null;
+    isActive?: boolean;
 };
 
 export type UserUserStatisticReadUserSummary = {
@@ -6838,6 +6849,51 @@ export type ApiUsersIdGetResponses = {
 };
 
 export type ApiUsersIdGetResponse = ApiUsersIdGetResponses[keyof ApiUsersIdGetResponses];
+
+export type ApiUsersIdPatchData = {
+    /**
+     * The updated User resource
+     */
+    body: UserUserWriteJsonMergePatch;
+    path: {
+        /**
+         * User identifier
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/api/users/{id}';
+};
+
+export type ApiUsersIdPatchErrors = {
+    /**
+     * Invalid input
+     */
+    400: ErrorJsonld;
+    /**
+     * Forbidden
+     */
+    403: ErrorJsonld;
+    /**
+     * Not found
+     */
+    404: ErrorJsonld;
+    /**
+     * An error occurred
+     */
+    422: ConstraintViolationJsonld;
+};
+
+export type ApiUsersIdPatchError = ApiUsersIdPatchErrors[keyof ApiUsersIdPatchErrors];
+
+export type ApiUsersIdPatchResponses = {
+    /**
+     * User resource updated
+     */
+    200: UserUserRead;
+};
+
+export type ApiUsersIdPatchResponse = ApiUsersIdPatchResponses[keyof ApiUsersIdPatchResponses];
 
 export type ApiUsersIdPutData = {
     /**
