@@ -66,6 +66,27 @@ sont donc :
 | E2E | `npm run test:e2e` | `tests/e2e/**`, backend requis |
 
 Les trois premières tournent en CI (`.github/workflows/front-ci.yml`) sur chaque push.
+Elles ne tiennent que parce que le SDK est versionné : sans lui, aucune étape ne pourrait
+s'exécuter sans backend. **Ne pas dégager `src/api/generated/` du dépôt.**
+
+> ℹ️ **`auxilia-api` n'a aucune CI** — vérifié le 1er septembre 2026, pas de
+> `.github/workflows/` dans le dépôt backend. Ce n'est pas un oubli isolé : une CI backend
+> exigerait de reconstruire le schéma de base depuis le dépôt, or **aucune migration ne crée
+> le schéma** (chantier A de `../ROADMAP.md`). Les portes backend sont donc manuelles et
+> locales.
+
+> 🟠 **`npm run test:e2e` écrit dans la base de démonstration.** `playwright.config.ts` ne
+> configure volontairement pas `webServer` : il faut lancer `npm run dev` à la main, et la
+> suite vise `localhost:5173` → proxy → `:8080`, donc la base de **dev**. 5 des 7 spec
+> écrivent (`ownership-ecriture`, `utilisateurs-edition`, `parcours`, `auth`, `security`).
+> C'est le même défaut d'isolation que `bin/phpunit` côté backend, et il attend le même
+> correctif (chantier B de `../ROADMAP.md`). **Sauvegarder la base avant de lancer :**
+> ```bash
+> docker compose exec -T database mysqldump -uroot -proot --single-transaction auxilia_lms > sauvegarde.sql
+> ```
+> Rappel de méthode : `workers: 1` n'est pas un réglage de confort mais une contrainte —
+> à 3 workers la suite saturait l'API Docker sous Windows et produisait des échecs en
+> cascade qui ressemblaient à des bugs applicatifs.
 
 ⚠️ `npm run dev` **ne type-checke pas**. Un code qui tourne en dev peut casser le build.
 Toujours lancer `npm run type-check` avant de considérer un chantier terminé — c'est
@@ -153,6 +174,37 @@ const res = await fetch('/api/formations', { credentials: 'include' })
 
 Après toute modification d'entité backend, régénérer le SDK : `npm run generate:api`.
 
+> **Dérogations au « jamais de `fetch()` manuel » — inventaire exhaustif, vérifié le
+> 1er septembre 2026.** Il y en a **six**, pas une. Une formulation antérieure de ce
+> paragraphe annonçait l'upload comme « la seule dérogation ; toute autre est un bug » :
+> c'était faux et cela aurait fait passer du code légitime pour un défaut.
+>
+> | Emplacement | Route | Verdict |
+> |---|---|---|
+> | `useDocuments.ts:37` (`uploadDocument`) | `POST /api/documents` | ✅ **inévitable** — multipart, le SDK ne gère pas `FormData` |
+> | `stores/auth.ts:49` (`fetchMe`) | `GET /api/auth/me` | ✅ **inévitable** — route d'`AuthController`, absente du schéma OpenAPI donc du SDK |
+> | `stores/auth.ts:101` (`refresh`) | `POST /api/auth/refresh` | ✅ **inévitable** — idem |
+> | `stores/auth.ts:122` (`logout`) | `POST /api/auth/logout` | ✅ **inévitable** — idem |
+> | `stores/auth.ts:86` (debug) | `GET /api/auth/debug` | ✅ **inévitable** — idem, et gardé par `import.meta.env.DEV` |
+> | `stores/auth.ts:72` (`login`) | `POST /api/auth/login` | ⚠️ **évitable** — l'opération **existe** dans le SDK sous le nom `loginCheckPost` (`src/api/generated/sdk.gen.ts:664`), générée par le décorateur OpenAPI de lexik-jwt |
+>
+> Règle exacte, donc : **tout ce qui est dans le schéma OpenAPI passe par le SDK.** Les routes
+> du contrôleur custom `AuthController` n'y sont pas et ne peuvent pas y être ; l'upload
+> multipart y est mais n'est pas exploitable. Le seul écart réel est `login`.
+
+#### Édition d'un utilisateur — contrat modifié le 25 août 2026
+
+Deux changements à connaître, sous peine d'écrire du code qui échouera en 422 :
+
+- **`password` est devenu `plainPassword`** dans le schéma d'écriture. Le champ est
+  facultatif à la mise à jour (« laisser vide pour conserver ») et obligatoire à la seule
+  création.
+- **Utiliser `apiUsersIdPatch`, pas `apiUsersIdPut`.** Le `PATCH`
+  (`application/merge-patch+json`) ne transporte que les champs modifiés — c'est lui qui
+  permet de conserver son propre email. Le type à employer est
+  `UserUserWriteJsonMergePatch`, dont tous les champs sont optionnels ; il rend inutile
+  l'ancien cast `as UserUserWrite`.
+
 ### Composables — pattern standard
 Chaque feature a un composable `use*.ts` qui encapsule :
 - L'état local (`ref`, `computed`)
@@ -205,12 +257,25 @@ Classes utilitaires globales :
 
 ### Rôles utilisateurs (valeurs exactes dans `user.roles[]`)
 ```
-ROLE_ADMIN
+ROLE_ADMIN          ← relabellisé « Superviseur » côté produit (le code garde ROLE_ADMIN)
 ROLE_DIRECTEUR
 ROLE_RESPONSABLE_PED
+ROLE_SECRETARIAT    ← existe depuis le 21 août 2026 — VOIR L'AVERTISSEMENT CI-DESSOUS
 ROLE_FORMATEUR
-ROLE_USER  ← rôle de base (tous les utilisateurs)
+ROLE_USER           ← rôle de base (tous les utilisateurs)
 ```
+
+> ⚠️ **`ROLE_SECRETARIAT` existe côté API mais pas côté interface.** Le compte
+> `secretariat@auxilium.test` est seedé et lit documents, inscriptions et parcours via
+> l'API. Mais le front ne connaît pas ce rôle : `KNOWN_ROLES`, `ROLE_LABELS`,
+> `ROLE_SEVERITY` (`pages/utilisateurs/index.vue`) et `ROLE_OPTIONS`
+> (`components/utilisateurs/UserForm.vue`) l'ignorent tous. Conséquences : le compte
+> s'affiche « Stagiaire », atterrit sur `/dashboard/stagiaire`, et **on ne peut nommer
+> personne au secrétariat depuis l'écran**. Câblage prévu à l'étape 5 de la Phase 17.
+
+> ⚠️ **`hasRole()` ne déplie PAS `role_hierarchy`.** `stores/auth.ts` lit les rôles bruts
+> renvoyés par `/api/auth/me`. Un compte qui hérite de droits côté Symfony ne les verra
+> pas apparaître dans l'interface. C'est la cause du point ci-dessus.
 
 ### Guards dans `router/index.ts`
 - `router.beforeEach()` vérifie `auth.user` → redirige vers `/login` si non authentifié.
