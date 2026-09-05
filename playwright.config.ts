@@ -1,6 +1,10 @@
 import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
+  // Garde d'isolation — refuse de lancer la suite si la pile API tourne en `APP_ENV=dev`,
+  // auquel cas les 5 spec qui écrivent pollueraient la base de DÉMONSTRATION. Détail,
+  // couplage et procédure de bascule : tests/e2e/global-setup.ts.
+  globalSetup: './tests/e2e/global-setup.ts',
   testDir: './tests/e2e',
   // Un test type = login (~10 s) + chargement d'une page qui enchaîne plusieurs
   // requêtes vers l'API Docker (~10-20 s sur Windows). 30 s était trop juste et

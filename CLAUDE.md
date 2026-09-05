@@ -70,20 +70,76 @@ Elles ne tiennent que parce que le SDK est versionné : sans lui, aucune étape 
 s'exécuter sans backend. **Ne pas dégager `src/api/generated/` du dépôt.**
 
 > ℹ️ **`auxilia-api` n'a aucune CI** — vérifié le 1er septembre 2026, pas de
-> `.github/workflows/` dans le dépôt backend. Ce n'est pas un oubli isolé : une CI backend
-> exigerait de reconstruire le schéma de base depuis le dépôt, or **aucune migration ne crée
-> le schéma** (chantier A de `../ROADMAP.md`). Les portes backend sont donc manuelles et
-> locales.
+> `.github/workflows/` dans le dépôt backend. Le motif invoqué ici jusqu'au 5 septembre 2026
+> — « aucune migration ne crée le schéma » — **n'est plus vrai sur la branche de travail**
+> `feat/lms-api-foundation` : le socle de migration du 4 septembre monte les 33 tables à lui
+> seul, y compris pour la base de test. Il reste vrai sur `main` jusqu'à la fusion.
+> **Deux obstacles réels subsistent avant de brancher une CI backend**, tous deux mesurés le
+> 5 septembre 2026 et consignés dans `../ROADMAP.md` :
+> 1. `bin/phpunit` rend le **code de sortie 1** alors que zéro test échoue (warning
+>    « `AbstractFunctionalTest` … is abstract » + `failOnPhpunitWarning` à `true` par défaut en
+>    PHPUnit 11). Une CI branchée aujourd'hui serait rouge en permanence.
+> 2. En `APP_ENV=test`, Dotenv saute `.env.local` : un runner sans ce fichier tourne avec
+>    `APP_SECRET` **vide** et `JWT_PASSPHRASE` sur le placeholder de `.env`. Le vert obtenu ne
+>    prouverait rien d'une configuration réaliste.
 
-> 🟠 **`npm run test:e2e` écrit dans la base de démonstration.** `playwright.config.ts` ne
-> configure volontairement pas `webServer` : il faut lancer `npm run dev` à la main, et la
-> suite vise `localhost:5173` → proxy → `:8080`, donc la base de **dev**. 5 des 7 spec
-> écrivent (`ownership-ecriture`, `utilisateurs-edition`, `parcours`, `auth`, `security`).
-> C'est le même défaut d'isolation que `bin/phpunit` côté backend, et il attend le même
-> correctif (chantier B de `../ROADMAP.md`). **Sauvegarder la base avant de lancer :**
+> ✅ **`npm run test:e2e` n'écrit plus dans la base de démonstration — résolu le 5 septembre 2026,
+> et la suite a été exécutée pour la première fois ce jour-là.**
+>
+> **Le piège à connaître :** le correctif backend du 5 septembre (`dbname_suffix`) **ne couvre
+> pas** ce cas. Il vit dans le bloc `when@test` de `config/packages/doctrine.yaml` et ne
+> s'applique qu'en `APP_ENV=test`, alors que la suite vise `localhost:5173` → proxy Vite →
+> `:8080`, c'est-à-dire les conteneurs `nginx`/`php`. La solution retenue est donc de **basculer
+> la pile HTTP** le temps de la suite :
 > ```bash
-> docker compose exec -T database mysqldump -uroot -proot --single-transaction auxilia_lms > sauvegarde.sql
+> # 1. AVANT CHAQUE EXÉCUTION — la suite n'est PAS idempotente (voir plus bas), depuis auxilia-api/
+> docker compose exec php php bin/console doctrine:fixtures:load --env=test --no-interaction
+> # 2. bascule, suite, retour
+> APP_ENV=test docker compose up -d php nginx      # depuis auxilia-api/
+> npm run dev                                      # depuis auxilia-front/, dans un autre terminal
+> npm run test:e2e
+> docker compose up -d php nginx                   # RETOUR EN DEV — ne pas oublier
 > ```
+> *(Au tout premier usage seulement, la base de test doit d'abord être créée :
+> `doctrine:migrations:migrate --env=test` — cf. `auxilia-api/CLAUDE.md` §8.)*
+>
+> `compose.override.yaml:24` et `:36` ont dû passer de `APP_ENV: dev` à `${APP_ENV:-dev}` :
+> la valeur y était codée en dur et **écrasait silencieusement** le `${APP_ENV:-dev}` de
+> `compose.yaml:12` et `:49`. Sans ce changement, `APP_ENV=test docker compose up -d` résolvait
+> à `dev` sans le moindre message — et la suite polluait la démo en paraissant isolée.
+>
+> **Le geste humain est gardé, pas supposé.** `tests/e2e/global-setup.ts` interroge
+> `/api/auth/debug` (200 en `dev`, 404 hors `dev`) et **refuse de lancer la suite** si la pile
+> est en `dev`, en affichant la procédure. Il échoue à la fermeture : toute réponse autre que
+> 404 est refusée.
+>
+> ⚠ **Ce que le garde ne prouve pas.** 404 établit « la pile n'est pas en `dev` », **jamais**
+> « la pile est en `test` ». Une pile en `APP_ENV=prod` répond 404 elle aussi, or `when@prod`
+> n'ajoute que des caches — **aucun `dbname_suffix`** — et la suite écrirait dans `auxilia_lms`.
+> Limite connue et assumée : il n'existe aujourd'hui aucun signal HTTP propre prouvant « c'est
+> test », et un discriminant bricolé serait plus fragile que la limite qu'il masque. Dette 🟡
+> dans `../ROADMAP.md`. Second couplage : supprimer `/api/auth/debug` rendrait le garde
+> silencieusement inopérant — le supprimer impose de réécrire `global-setup.ts` dans le même lot.
+>
+> **Le préchauffage n'est pas décoratif.** `global-setup.ts` charge `/` puis `/login` dans un
+> navigateur avant le premier spec, ce qui force Vite à transformer les modules de route.
+> Mesuré le 5 septembre : sans lui, les 3 premiers tests échouaient sur une session neuve
+> (test 1 à **26,5 s** contre un `waitForURL` de 15 s) ; avec lui, préchauffage de **8,2 s** puis
+> test 1 à **6,8 s**, et la suite complète passe de **9,2 min à 4,8 min**. Relever le timeout
+> aurait masqué le coût au lieu de le déplacer, et il serait revenu sur une machine plus lente.
+>
+> 🟠 **La suite n'est PAS idempotente — rechargez les fixtures avant chaque exécution.**
+> Découvert le 5 septembre 2026 en la lançant deux fois de suite. `ownership-ecriture.spec.ts:266`
+> crée une `lesson_completion` et la **commite** ; au run suivant, la même paire
+> `(lesson_id, enrollment_id)` heurte l'index unique `unique_lesson_enrollment` et l'API rend
+> **500** au lieu de 201. Symptôme trompeur : cela ressemble à une régression applicative.
+> *Preuve :* fixtures rechargées (`lesson_completion` 968 → 967), spec rejoué → `POST` 201,
+> 3/3 verts. C'est la dette de déterminisme du backend qui mord ici, pas un défaut du front.
+>
+> **Preuve d'isolation, 5 septembre 2026** — deux suites complètes plus des rejeux, base de
+> démonstration `answer`/`user`/`enrollment`/`lesson_completion` à **84 / 53 / 47 / 967 avant et
+> après**. Côté test, `lesson_completion` monte à 968 : l'écriture y est bien allée.
+>
 > Rappel de méthode : `workers: 1` n'est pas un réglage de confort mais une contrainte —
 > à 3 workers la suite saturait l'API Docker sous Windows et produisait des échecs en
 > cascade qui ressemblaient à des bugs applicatifs.
