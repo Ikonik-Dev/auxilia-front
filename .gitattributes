@@ -11,7 +11,7 @@
 #     4 lignes ajoutées le 5 septembre 2026 l'ont été en CRLF dans un fichier
 #     entièrement LF. Diff « 4 0 », rien à voir, personne ne l'a remarqué ;
 #   * `CLAUDE.md` : 75 lignes en CRLF sur 413, normalisées par la règle
-#     ci-dessous le 5 septembre 2026.
+#     ci-dessous le 8 septembre 2026 (commit `7a83cc1`).
 #
 # La règle qui suit est reprise mot pour mot du dépôt racine
 # (`Auxilia/.gitattributes`), motif compris : la décision était déjà prise là-bas,

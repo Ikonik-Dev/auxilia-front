@@ -69,14 +69,14 @@ Les trois premières tournent en CI (`.github/workflows/front-ci.yml`) sur chaqu
 Elles ne tiennent que parce que le SDK est versionné : sans lui, aucune étape ne pourrait
 s'exécuter sans backend. **Ne pas dégager `src/api/generated/` du dépôt.**
 
-> ℹ️ **`auxilia-api` a une CI depuis le 5 septembre 2026** —
+> ℹ️ **`auxilia-api` a une CI depuis le 8 septembre 2026** —
 > `.github/workflows/api-ci.yml`. Premier run vert le jour même : `API CI #1`, branche
 > `feat/lms-api-foundation`, 3 min 25 s. Il enchaîne `composer install`, un keypair JWT
 > jetable, une base MySQL 8 de service (migrations puis fixtures), PHPStan et PHPUnit.
 > Les deux dépôts de code ont donc désormais leur porte automatique, sur `push` (toutes
 > branches) et `pull_request`.
 >
-> ⚠ **Énoncé caduc, daté et conservé.** Ce bloc affirmait jusqu'au 5 septembre 2026
+> ⚠ **Énoncé caduc, daté et conservé.** Ce bloc affirmait jusqu'au 8 septembre 2026
 > qu'`auxilia-api` n'avait **aucune** CI, et que « deux obstacles réels subsistent avant
 > d'en brancher une » : le code de sortie 1 de `bin/phpunit` malgré zéro échec — attribué
 > à tort à *PHPUnit 11*, le projet étant en **13.1.10** — et l'absence de secrets sur un
