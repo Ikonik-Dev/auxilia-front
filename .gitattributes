@@ -1,0 +1,30 @@
+# =============================================================================
+# .gitattributes — dépôt « auxilia-front »
+#
+# Raison d'être : ce dépôt porte `core.autocrlf = false` en configuration LOCALE
+# — seul des trois du projet, la racine et `auxilia-api` héritant du `true`
+# global. Git n'y normalise donc rien : les octets qu'un éditeur écrit entrent
+# tels quels dans le blob, et le dépôt dérive dans les deux sens.
+#
+# Ce n'est pas une hypothèse, c'est arrivé deux fois :
+#   * `playwright.config.ts` : 0 CR en `fe1e922`, 4 CR en `8150457` — les
+#     4 lignes ajoutées le 5 septembre 2026 l'ont été en CRLF dans un fichier
+#     entièrement LF. Diff « 4 0 », rien à voir, personne ne l'a remarqué ;
+#   * `CLAUDE.md` : 75 lignes en CRLF sur 413, normalisées par la règle
+#     ci-dessous le 5 septembre 2026.
+#
+# La règle qui suit est reprise mot pour mot du dépôt racine
+# (`Auxilia/.gitattributes`), motif compris : la décision était déjà prise là-bas,
+# elle n'avait simplement jamais été appliquée ici.
+# =============================================================================
+
+# Documentation : normalisée en LF dans le dépôt, restituée selon la plateforme.
+# C'est du texte relu et diffé — c'est là que la normalisation est utile.
+*.md text
+
+# ⚠ PAS de règle `*.text` sur les sources TypeScript, et c'est délibéré.
+# Cinq fichiers `.ts` portent aujourd'hui des CR, dont `ownership-ecriture.spec.ts`
+# intégralement en CRLF (314 lignes). Les couvrir ici les renormaliserait toutes
+# d'un coup, au milieu d'un chantier de documentation et sur du code de test vivant.
+# Dette ouverte dans `../ROADMAP.md`, avec son remède nommé : étendre ce fichier à
+# `*.ts` puis `git add --renormalize`, dans un commit qui ne fait QUE cela.
