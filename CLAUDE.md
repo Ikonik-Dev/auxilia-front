@@ -69,19 +69,23 @@ Les trois premières tournent en CI (`.github/workflows/front-ci.yml`) sur chaqu
 Elles ne tiennent que parce que le SDK est versionné : sans lui, aucune étape ne pourrait
 s'exécuter sans backend. **Ne pas dégager `src/api/generated/` du dépôt.**
 
-> ℹ️ **`auxilia-api` n'a aucune CI** — vérifié le 1er septembre 2026, pas de
-> `.github/workflows/` dans le dépôt backend. Le motif invoqué ici jusqu'au 5 septembre 2026
-> — « aucune migration ne crée le schéma » — **n'est plus vrai sur la branche de travail**
-> `feat/lms-api-foundation` : le socle de migration du 4 septembre monte les 33 tables à lui
-> seul, y compris pour la base de test. Il reste vrai sur `main` jusqu'à la fusion.
-> **Deux obstacles réels subsistent avant de brancher une CI backend**, tous deux mesurés le
-> 5 septembre 2026 et consignés dans `../ROADMAP.md` :
-> 1. `bin/phpunit` rend le **code de sortie 1** alors que zéro test échoue (warning
->    « `AbstractFunctionalTest` … is abstract » + `failOnPhpunitWarning` à `true` par défaut en
->    PHPUnit 11). Une CI branchée aujourd'hui serait rouge en permanence.
-> 2. En `APP_ENV=test`, Dotenv saute `.env.local` : un runner sans ce fichier tourne avec
->    `APP_SECRET` **vide** et `JWT_PASSPHRASE` sur le placeholder de `.env`. Le vert obtenu ne
->    prouverait rien d'une configuration réaliste.
+> ℹ️ **`auxilia-api` a une CI depuis le 5 septembre 2026** —
+> `.github/workflows/api-ci.yml`. Premier run vert le jour même : `API CI #1`, branche
+> `feat/lms-api-foundation`, 3 min 25 s. Il enchaîne `composer install`, un keypair JWT
+> jetable, une base MySQL 8 de service (migrations puis fixtures), PHPStan et PHPUnit.
+> Les deux dépôts de code ont donc désormais leur porte automatique, sur `push` (toutes
+> branches) et `pull_request`.
+>
+> ⚠ **Énoncé caduc, daté et conservé.** Ce bloc affirmait jusqu'au 5 septembre 2026
+> qu'`auxilia-api` n'avait **aucune** CI, et que « deux obstacles réels subsistent avant
+> d'en brancher une » : le code de sortie 1 de `bin/phpunit` malgré zéro échec — attribué
+> à tort à *PHPUnit 11*, le projet étant en **13.1.10** — et l'absence de secrets sur un
+> runner. Les deux sont traités dans le workflow.
+>
+> **Le détail n'est pas repris ici, volontairement** : contournements, dettes restantes et
+> limites de ce qu'un badge vert prouve vivent dans la documentation privée
+> (`auxilia-api/CLAUDE.md` §8 et `ROADMAP.md`). Les dupliquer dans ce dépôt public
+> reviendrait à les y maintenir.
 
 > ✅ **`npm run test:e2e` n'écrit plus dans la base de démonstration — résolu le 5 septembre 2026,
 > et la suite a été exécutée pour la première fois ce jour-là.**
