@@ -1,7 +1,8 @@
 ﻿<script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { UserUserRead } from '@/api'
 import type { UserFormPayload } from '@/composables/useUtilisateurs'
+import { useUserCapabilities, ROLE_LABELS } from '@/composables/useUserCapabilities'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import MultiSelect from 'primevue/multiselect'
@@ -30,13 +31,21 @@ const phone     = ref('')
 const isActive  = ref(true)
 const roles     = ref<string[]>([])
 
-const ROLE_OPTIONS = [
-  { label: 'Admin',                value: 'ROLE_ADMIN' },
-  { label: 'Directeur',            value: 'ROLE_DIRECTEUR' },
-  { label: 'Formateur',            value: 'ROLE_FORMATEUR' },
-  { label: 'Responsable péda.',    value: 'ROLE_RESPONSABLE_PED' },
-  { label: 'Stagiaire',            value: 'ROLE_USER' },
-]
+const { assignableRoles } = useUserCapabilities()
+
+// Roles proposables = ceux que le plafond de l'acteur autorise, UNION ceux que la fiche
+// porte deja. L'union n'est pas un confort : sans elle l'auto-edition casse pour tout
+// compte dont la fiche est de niveau superieur a son plafond — motif complet dans
+// `useUserCapabilities.ts`, sur `assignableRoles()`.
+//
+// ⚠ `props.user` est reactif : le dialogue est monte une fois et rejoue pour chaque cible.
+// Un tableau constant ne se recalculerait pas — d'ou le `computed`.
+const ROLE_OPTIONS = computed(() =>
+  assignableRoles(props.user).map((value) => ({
+    label: ROLE_LABELS[value] ?? value,
+    value,
+  })),
+)
 
 // ── Populate when editing ──
 watch(

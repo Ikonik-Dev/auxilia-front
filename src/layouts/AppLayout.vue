@@ -29,7 +29,13 @@ function primaryRole(): string {
 const allNavItems: NavItem[] = [
   { label: 'Tableau de bord', icon: 'pi pi-home',           to: '/dashboard',     roles: [] },
   { label: 'Formations',      icon: 'pi pi-book',            to: '/formations',    roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_FORMATEUR'] },
-  { label: 'Utilisateurs',    icon: 'pi pi-users',           to: '/utilisateurs',  roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR'] },
+  // Phase 17 etape 4 — les 5 roles qui ont affaire a cet ecran.
+  // ⚠ ROLE_ADMIN et ROLE_DIRECTEUR sont listes EXPLICITEMENT : le filtre de :47 fait
+  // `some(hasRole)` sur les roles BRUTS de /api/auth/me, qui ne deplie pas role_hierarchy.
+  // Mesure le 9 sept. 2026 : directeur@ rend ["ROLE_DIRECTEUR","ROLE_USER"] — pas
+  // ROLE_RESPONSABLE_PED ; superviseur@ rend ["ROLE_ADMIN","ROLE_USER"] — pas ROLE_DIRECTEUR.
+  // L'heritage qui les fait entrer cote back N'OPERE PAS ici.
+  { label: 'Utilisateurs',    icon: 'pi pi-users',           to: '/utilisateurs',  roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_SECRETARIAT', 'ROLE_RESPONSABLE_PED', 'ROLE_FORMATEUR'] },
   { label: 'Inscriptions',    icon: 'pi pi-user-plus',       to: '/inscriptions',  roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_RESPONSABLE_PED'] },
   { label: 'Évaluations',     icon: 'pi pi-check-circle',    to: '/evaluations',   roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_FORMATEUR'] },
   { label: 'Assiduité',       icon: 'pi pi-calendar-clock',  to: '/assiduite',     roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_FORMATEUR'] },

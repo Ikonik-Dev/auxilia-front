@@ -87,7 +87,14 @@ export const router = createRouter({
           path: 'utilisateurs',
           name: 'utilisateurs',
           component: () => import('@/pages/utilisateurs/index.vue'),
-          meta: { roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR'] },
+          // Phase 17 etape 4 — miroir de l'expression `security:` de GetCollection
+          // sur User.php (auxilia-api).
+          // ⚠ Meme raison qu'en AppLayout:32 : le guard de :178-183 fait `some(hasRole)`
+          // sur les roles bruts, la hierarchie n'est pas depliee cote front. ROLE_ADMIN et
+          // ROLE_DIRECTEUR doivent donc etre explicites.
+          // ROLE_USER est volontairement absent : l'API rend 403 a un stagiaire sur
+          // GET /api/users (mesure le 9 septembre 2026).
+          meta: { roles: ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_SECRETARIAT', 'ROLE_RESPONSABLE_PED', 'ROLE_FORMATEUR'] },
         },
         {
           path: 'inscriptions',

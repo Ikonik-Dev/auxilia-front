@@ -325,13 +325,56 @@ ROLE_FORMATEUR
 ROLE_USER           ← rôle de base (tous les utilisateurs)
 ```
 
-> ⚠️ **`ROLE_SECRETARIAT` existe côté API mais pas côté interface.** Le compte
-> `secretariat@auxilium.test` est seedé et lit documents, inscriptions et parcours via
-> l'API. Mais le front ne connaît pas ce rôle : `KNOWN_ROLES`, `ROLE_LABELS`,
-> `ROLE_SEVERITY` (`pages/utilisateurs/index.vue`) et `ROLE_OPTIONS`
-> (`components/utilisateurs/UserForm.vue`) l'ignorent tous. Conséquences : le compte
-> s'affiche « Stagiaire », atterrit sur `/dashboard/stagiaire`, et **on ne peut nommer
-> personne au secrétariat depuis l'écran**. Câblage prévu à l'étape 5 de la Phase 17.
+> ✅ **`ROLE_SECRETARIAT` est connu de l'écran `/utilisateurs` depuis le 9 septembre 2026**
+> (Phase 17 étape 4). Il figure dans `KNOWN_ROLES`, le filtre par rôle, `ROLE_SEVERITY`
+> (`pages/utilisateurs/index.vue`) et `ROLE_LABELS` (désormais dans
+> `composables/useUserCapabilities.ts`) : la fiche s'affiche « Secrétariat », et le rôle est
+> assignable depuis le formulaire par qui a le plafond pour le faire.
+>
+> ⚠️ **Ce qui RESTE vrai, et qui est l'étape 5 :** un compte `ROLE_SECRETARIAT` atterrit
+> toujours sur `/dashboard/stagiaire`, parce que le front ne déplie pas la hiérarchie (voir
+> l'encadré suivant). L'écran `/utilisateurs` le connaît ; la redirection de tableau de bord,
+> non.
+>
+> ⚠️ **Énoncé caduc depuis le 9 septembre 2026, conservé et daté :** « **`ROLE_SECRETARIAT`
+> existe côté API mais pas côté interface.** … le front ne connaît pas ce rôle :
+> `KNOWN_ROLES`, `ROLE_LABELS`, `ROLE_SEVERITY` … et `ROLE_OPTIONS` l'ignorent tous.
+> Conséquences : le compte s'affiche « Stagiaire », … et **on ne peut nommer personne au
+> secrétariat depuis l'écran**. »
+
+### `/utilisateurs` — capacités par cible (Phase 17 étape 4, 9 septembre 2026)
+
+L'écran n'est plus gardé par `isAdmin`. Il applique le **tier model** du backend :
+
+| | Où | Quoi |
+|---|---|---|
+| **La porte** | `AppLayout.vue` (menu) + `router/index.ts` (`meta.roles`) | 5 rôles : `ROLE_ADMIN`, `ROLE_DIRECTEUR`, `ROLE_SECRETARIAT`, `ROLE_RESPONSABLE_PED`, `ROLE_FORMATEUR` |
+| **Les capacités** | `composables/useUserCapabilities.ts` | `canOpenPage`, `canCreate`, `canEdit(u)`, `canDelete(u)`, `assignableRoles(u)` |
+
+⚠️ **`ROLE_ADMIN` et `ROLE_DIRECTEUR` sont listés EXPLICITEMENT dans les deux `roles`.** Le
+front ne déplie pas la hiérarchie : l'héritage qui les fait entrer côté Symfony n'opère pas
+ici. Mesuré — `/api/auth/me` rend `["ROLE_DIRECTEUR","ROLE_USER"]` pour un directeur et
+`["ROLE_ADMIN","ROLE_USER"]` pour le superviseur.
+
+⚠️ **`useUserCapabilities.ts` DUPLIQUE les tables de `UserVoter.php`** (autre dépôt, aucune
+porte commune). L'original est le backend ; toute modification part de là. Mode de panne
+**fail-safe** : une dérive fait proposer un bouton que l'API refuse en 403 — laid, pas une
+faille. Dette 🟡 `assignableRoles` dans `ROADMAP.md`. Contrôle :
+`tests/unit/composables/useUserCapabilities.spec.ts` (7 tests, pendant front de `UserVoterTest`).
+
+**Choix C — le formateur consulte, il ne modifie pas.** La colonne d'actions est toujours
+rendue, mais chaque bouton suit la capacité **de sa ligne**. Vérifié à l'écran le 9 septembre
+2026 : un formateur voit ses stagiaires **sans crayon**, et le seul crayon de sa liste est
+sur sa propre fiche. Personne n'a de corbeille sur sa propre ligne.
+
+> 🟠 **L'écran ne montre que 30 fiches au maximum, et rien ne le dit.**
+> `useUtilisateurs.fetchUtilisateurs()` ne demande que la page 1, et l'API pagine à 30
+> (`api_platform.yaml`). Le paginateur du `DataTable` est **client** : il feuillette les
+> 30 lignes reçues, pas la collection. Mesuré le 9 septembre 2026 — le superviseur voit
+> **30** fiches là où l'API en accorde 53, le directeur 30 pour 51, le resp. péda 30 pour 48,
+> le secrétariat 30 pour 42. Les formateurs (18 et 20) sont sous le plafond et complets.
+> Défaut **préexistant** — il ne touchait qu'un compte quand la page était réservée au
+> superviseur ; l'étape 4 l'étend à quatre. Dette consignée dans `ROADMAP.md`.
 
 > ⚠️ **`hasRole()` ne déplie PAS `role_hierarchy`.** `stores/auth.ts` lit les rôles bruts
 > renvoyés par `/api/auth/me`. Un compte qui hérite de droits côté Symfony ne les verra

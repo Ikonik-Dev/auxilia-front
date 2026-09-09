@@ -1,6 +1,8 @@
 ﻿<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useAuthStore } from '@/stores/auth'
+// `useAuthStore` n'est plus importe ici : la page ne lit plus les roles elle-meme,
+// `useUserCapabilities` encapsule cette lecture (et la table de niveaux qui va avec).
+import { useUserCapabilities, ROLE_LABELS } from '@/composables/useUserCapabilities'
 import { useUtilisateurs } from '@/composables/useUtilisateurs'
 import type { UserFormPayload } from '@/composables/useUtilisateurs'
 import UserForm from '@/components/utilisateurs/UserForm.vue'
@@ -16,17 +18,23 @@ import Skeleton from 'primevue/skeleton'
 import { useToast } from 'primevue/usetoast'
 import Toast from 'primevue/toast'
 
-const auth = useAuthStore()
 const toast = useToast()
 const { utilisateurs, loading, error, fetchUtilisateurs, createUser, updateUser, deleteUser } = useUtilisateurs()
 
-const canWrite = computed(() => auth.hasRole('ROLE_ADMIN') || auth.hasRole('ROLE_DIRECTEUR'))
-
-const isAdmin = computed(() => auth.hasRole('ROLE_ADMIN'))
+// Phase 17 etape 4 — capacites par cible, miroir de UserVoter.
+//
+// `isAdmin` et `canWrite` ont disparu. Le premier fermait la page a tout le monde sauf
+// ROLE_ADMIN — un directeur voyait l'entree de menu, cliquait, et tombait sur « Acces
+// reserve ». Le second incluait ROLE_DIRECTEUR sans que cela ne decide jamais rien : tout
+// ce qu'il gardait vivait dans la branche `v-else` de `!isAdmin`, atteignable par le seul
+// ROLE_ADMIN. Sa clause `|| ROLE_DIRECTEUR` etait du code mort.
+const { canOpenPage, canCreate, canEdit, canDelete } = useUserCapabilities()
 
 onMounted(() => {
   document.title = 'Utilisateurs — Auxilium'
-  if (isAdmin.value) fetchUtilisateurs()
+  // ⚠ Le fetch suit la MEME condition que le `v-if` du template. Les desynchroniser
+  // rouvrirait le defaut d'aujourd'hui a l'envers : page ouverte, liste jamais demandee.
+  if (canOpenPage.value) fetchUtilisateurs()
 })
 
 // ── Filtres ──
@@ -34,14 +42,19 @@ const search = ref('')
 const filterRole = ref('all')
 const filterStatus = ref<'all' | 'active' | 'inactive'>('all')
 
-const KNOWN_ROLES = ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_FORMATEUR', 'ROLE_RESPONSABLE_PED', 'ROLE_USER']
+// ⚠ ROLE_SECRETARIAT ajoute le 9 septembre 2026. Sans lui, `displayRoles()` le filtrait
+// et Nadia Benali s'affichait « Stagiaire » alors que l'API rend bien
+// ["ROLE_SECRETARIAT","ROLE_USER"] (mesure sur /api/auth/me).
+const KNOWN_ROLES = ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_SECRETARIAT', 'ROLE_RESPONSABLE_PED', 'ROLE_FORMATEUR', 'ROLE_USER']
 
+// Ordonne du niveau le plus eleve au plus bas, comme les tables de UserVoter.
 const roleOptions = [
   { label: 'Tous les rôles',      value: 'all' },
-  { label: 'Admin',               value: 'ROLE_ADMIN' },
+  { label: 'Superviseur',         value: 'ROLE_ADMIN' },
   { label: 'Directeur',           value: 'ROLE_DIRECTEUR' },
-  { label: 'Formateur',           value: 'ROLE_FORMATEUR' },
+  { label: 'Secrétariat',         value: 'ROLE_SECRETARIAT' },
   { label: 'Responsable péda.',   value: 'ROLE_RESPONSABLE_PED' },
+  { label: 'Formateur',           value: 'ROLE_FORMATEUR' },
   { label: 'Stagiaire',           value: 'ROLE_USER' },
 ]
 const statusOptions = [
@@ -65,18 +78,20 @@ const filtered = computed(() => {
 })
 
 // ── Helpers ──
-const ROLE_LABELS: Record<string, string> = {
-  ROLE_ADMIN:           'Admin',
-  ROLE_DIRECTEUR:       'Directeur',
-  ROLE_FORMATEUR:       'Formateur',
-  ROLE_RESPONSABLE_PED: 'Resp. péda.',
-  ROLE_USER:            'Stagiaire',
-}
+// ROLE_LABELS a demenage dans `composables/useUserCapabilities.ts` le 9 septembre 2026 :
+// il a desormais DEUX consommateurs — les badges ci-dessous et les options de UserForm —
+// et le relabel « Superviseur » ne doit pas pouvoir diverger entre les deux ecrans.
+//
+// ⚠ ROLE_SEVERITY, lui, RESTE ICI, et ce n'est pas un oubli de symetrie : il n'a qu'un seul
+// consommateur (le badge de :245) et son type est celui de PrimeVue. Le deplacer ferait
+// entrer une dependance a la bibliotheque d'interface dans un module d'autorisation.
+// A deplacer le jour ou un deuxieme ecran en aura besoin, pas avant.
 const ROLE_SEVERITY: Record<string, 'danger' | 'warn' | 'info' | 'secondary'> = {
   ROLE_ADMIN:           'danger',
   ROLE_DIRECTEUR:       'warn',
-  ROLE_FORMATEUR:       'info',
+  ROLE_SECRETARIAT:     'info',
   ROLE_RESPONSABLE_PED: 'info',
+  ROLE_FORMATEUR:       'info',
   ROLE_USER:            'secondary',
 }
 
@@ -159,10 +174,14 @@ async function handleDelete() {
 </script>
 
 <template>
-  <div v-if="!isAdmin" class="access-denied" role="alert">
+  <div v-if="!canOpenPage" class="access-denied" role="alert">
     <i class="pi pi-lock access-denied-icon" aria-hidden="true" />
-    <h2>Accès réservé à l'administration</h2>
-    <p>Cette page n'est accessible qu'aux administrateurs.</p>
+    <!-- ⚠ <h1>, pas <h2> : cette branche n'avait AUCUN <h1>, le titre de niveau 1 ne
+         vivant qu'en :172 dans la branche autorisée. Un compte refusé recevait donc une
+         page sans <h1>. Les deux branches sont exclusives (v-if / v-else) : il n'y a
+         jamais deux <h1> à l'écran. -->
+    <h1>Accès réservé</h1>
+    <p>Cette page est réservée aux personnes chargées de la gestion des comptes.</p>
   </div>
 
   <div v-else class="utilisateurs-page" :aria-busy="loading ? 'true' : undefined">
@@ -170,7 +189,8 @@ async function handleDelete() {
 
     <div class="page-header">
       <h1>Utilisateurs</h1>
-      <Button v-if="canWrite" label="Nouvel utilisateur" icon="pi pi-user-plus" @click="openCreate" />
+      <!-- Miroir de USER_CREATE sans sujet : plafond >= 1. Écarte formateur et stagiaire. -->
+      <Button v-if="canCreate" label="Nouvel utilisateur" icon="pi pi-user-plus" @click="openCreate" />
     </div>
 
     <!-- Erreur chargement -->
@@ -263,10 +283,16 @@ async function handleDelete() {
           <template #body="{ data }">{{ formatDate(data.createdAt) }}</template>
         </Column>
 
-        <Column v-if="canWrite" header="" style="width: 90px">
+        <!-- ⚠ CHOIX C — la colonne est toujours rendue (tout compte qui atteint la page
+             peut au moins éditer SA fiche), mais chaque bouton suit la capacité DE LA
+             LIGNE. Un formateur voit ses 17 ou 19 stagiaires SANS crayon : mesuré côté
+             API, GET 200 / PATCH 403. Une colonne « tout ou rien » promettrait une action
+             que l'API refuse. -->
+        <Column header="" style="width: 90px">
           <template #body="{ data }">
             <div class="row-actions">
               <Button
+                v-if="canEdit(data)"
                 icon="pi pi-pencil"
                 text
                 rounded
@@ -276,6 +302,7 @@ async function handleDelete() {
                 @click.stop="openEdit(data)"
               />
               <Button
+                v-if="canDelete(data)"
                 icon="pi pi-trash"
                 text
                 rounded

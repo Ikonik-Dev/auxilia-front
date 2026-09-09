@@ -72,7 +72,16 @@ describe('useUtilisateurs — édition', () => {
   it('remonte le detail d\'un refus de droits', async () => {
     apiUsersIdPatch.mockResolvedValue({
       data: undefined,
-      error: { detail: 'Accès refusé : vous ne pouvez pas modifier les rôles d\'un compte.' },
+      // Fixture alignée le 9 septembre 2026 sur le message réellement émis par
+      // `UserStateProcessor` depuis le commit backend 7cc8e48 (anti-escalade par plafond).
+      // ⚠ Ce test passait déjà et continuera de passer : il assertit `toThrow('Accès
+      // refusé')`, préfixe commun à l'ancien message et au nouveau. Ce n'était donc pas un
+      // test faux, mais une fixture documentant une phrase que le code n'émet plus.
+      error: {
+        detail:
+          'Accès refusé : vous ne pouvez pas modifier les rôles de ce compte — '
+          + 'le rôle « ROLE_ADMIN » dépasse votre plafond de gestion.',
+      },
     })
 
     const { updateUser } = useUtilisateurs()
