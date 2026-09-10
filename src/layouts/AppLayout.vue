@@ -16,8 +16,29 @@ interface NavItem {
   primaryOnly?: boolean
 }
 
-// Ordre décroissant de priorité dans la hiérarchie des rôles
-const ROLE_PRIORITY = ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_RESPONSABLE_PED', 'ROLE_FORMATEUR', 'ROLE_USER']
+// Ordre décroissant de priorité dans la hiérarchie des rôles.
+//
+// ⚠ ROLE_SECRETARIAT inséré le 10 septembre 2026 (Phase 17 étape 5) — mais PAS pour la
+// raison qu'on croit, et il faut le savoir avant de l'enlever ou de le déplacer.
+//
+// CE QUI CHANGE LE COMPORTEMENT D'UN SECRÉTARIAT, C'EST LE DÉPLIAGE, PAS CETTE LIGNE.
+// Depuis que `hasRole()` lit les rôles EFFECTIFS, un secrétariat porte ROLE_RESPONSABLE_PED
+// (il en hérite, `security.yaml:61`) : la boucle s'arrête donc à ROLE_RESPONSABLE_PED, qui
+// vient AVANT, et n'atteint jamais l'entrée ajoutée ici. Elle est **fonctionnellement
+// inerte en l'état** — mesuré, pas supposé.
+//
+// Elle est conservée pour une raison différente : la liste doit être COMPLÈTE. Le modèle
+// compte six rôles ; une liste à cinq est une bombe à retardement — si ROLE_SECRETARIAT
+// cessait d'hériter de ROLE_RESPONSABLE_PED, un secrétariat retomberait silencieusement
+// sur ROLE_USER, donc sur « Stagiaire », comme avant l'étape 5.
+//
+// ⚠ Et l'effet du dépliage, lui, est COSMÉTIQUE ET RÉVERSIBLE : `primary` n'est consommé
+// qu'en un seul endroit (le filtre `primaryOnly` plus bas), et les deux seuls items
+// concernés — « Mon Parcours » et « Mes Documents » — disparaissent du menu du secrétariat.
+// Leurs pages portent `meta: { roles: ['ROLE_USER'] }` (router:109 et :115), que TOUT LE
+// MONDE satisfait : masquer les entrées n'enferme personne dehors, les deux restent
+// atteignables par URL.
+const ROLE_PRIORITY = ['ROLE_ADMIN', 'ROLE_DIRECTEUR', 'ROLE_RESPONSABLE_PED', 'ROLE_SECRETARIAT', 'ROLE_FORMATEUR', 'ROLE_USER']
 
 function primaryRole(): string {
   for (const role of ROLE_PRIORITY) {

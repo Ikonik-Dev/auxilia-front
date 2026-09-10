@@ -331,10 +331,16 @@ ROLE_USER           ← rôle de base (tous les utilisateurs)
 > `composables/useUserCapabilities.ts`) : la fiche s'affiche « Secrétariat », et le rôle est
 > assignable depuis le formulaire par qui a le plafond pour le faire.
 >
-> ⚠️ **Ce qui RESTE vrai, et qui est l'étape 5 :** un compte `ROLE_SECRETARIAT` atterrit
-> toujours sur `/dashboard/stagiaire`, parce que le front ne déplie pas la hiérarchie (voir
-> l'encadré suivant). L'écran `/utilisateurs` le connaît ; la redirection de tableau de bord,
-> non.
+> ✅ **Réglé le 10 septembre 2026 (étape 5) :** un compte `ROLE_SECRETARIAT` atterrit
+> désormais sur **`/dashboard/responsable`**, et voit **Inscriptions** et **Statistiques**
+> au menu — mesuré à l'écran. Il perd en revanche « Mon Parcours » et « Mes Documents », deux
+> entrées `primaryOnly` réservées au rôle principal `ROLE_USER` ; les deux pages restent
+> atteignables par URL (`meta: { roles: ['ROLE_USER'] }`, que tout le monde satisfait).
+>
+> ⚠️ **Énoncé caduc depuis le 10 septembre 2026, conservé et daté :** « **Ce qui RESTE vrai,
+> et qui est l'étape 5 :** un compte `ROLE_SECRETARIAT` atterrit toujours sur
+> `/dashboard/stagiaire`, parce que le front ne déplie pas la hiérarchie. L'écran
+> `/utilisateurs` le connaît ; la redirection de tableau de bord, non. »
 >
 > ⚠️ **Énoncé caduc depuis le 9 septembre 2026, conservé et daté :** « **`ROLE_SECRETARIAT`
 > existe côté API mais pas côté interface.** … le front ne connaît pas ce rôle :
@@ -376,9 +382,58 @@ sur sa propre fiche. Personne n'a de corbeille sur sa propre ligne.
 > Défaut **préexistant** — il ne touchait qu'un compte quand la page était réservée au
 > superviseur ; l'étape 4 l'étend à quatre. Dette consignée dans `ROADMAP.md`.
 
-> ⚠️ **`hasRole()` ne déplie PAS `role_hierarchy`.** `stores/auth.ts` lit les rôles bruts
-> renvoyés par `/api/auth/me`. Un compte qui hérite de droits côté Symfony ne les verra
-> pas apparaître dans l'interface. C'est la cause du point ci-dessus.
+> ✅ **`hasRole()` LIT LES RÔLES EFFECTIFS depuis le 10 septembre 2026** (Phase 17 étape 5).
+> `/api/auth/me` rend désormais `grantedRoles`, déplié **côté serveur** par
+> `role_hierarchy` — le front ne recopie pas la hiérarchie, il la reçoit. Ses 13 sites
+> d'appel sont tous des tests d'accès écran : c'est la sémantique qu'ils ont toujours
+> voulue.
+>
+> ⚠️ **Énoncé caduc depuis le 10 septembre 2026, conservé et daté :** « **`hasRole()` ne
+> déplie PAS `role_hierarchy`.** `stores/auth.ts` lit les rôles bruts renvoyés par
+> `/api/auth/me`. Un compte qui hérite de droits côté Symfony ne les verra pas apparaître
+> dans l'interface. »
+
+### Deux notions de rôle — ne jamais les confondre
+
+`/api/auth/me` rend **quatre champs**, et ils ne se contiennent pas :
+
+| Champ du store | Gouverne | Remarque |
+|---|---|---|
+| `roles` | *(plus rien)* | les rôles **assignés**, bruts. Plus aucun lecteur depuis l'étape 5 |
+| `grantedRoles` | l'**accès aux écrans** | ce que lit `hasRole()`. Déplié par le serveur |
+| `assignableRoles` | le **droit de gestion** | la liste blanche du tier model |
+| `managesAllRoles` | le **second régime** | voir l'encadré plus bas |
+
+🔴 **N'alimentez jamais un calcul de droit de gestion avec `grantedRoles`.** Un
+`ROLE_SECRETARIAT` y porte `ROLE_RESPONSABLE_PED` : un plafond dérivé du déplié lui donnerait
+**47 fiches gérables au lieu de 41**. C'est le choix A du 21 août 2026 — la même asymétrie
+porte/tamis que le backend, transposée ici.
+
+**Replis, et ils sont asymétriques à dessein** (`stores/auth.ts`) : `grantedRoles` retombe sur
+`roles` — face à une API antérieure, un repli sur `[]` verrouillerait tout le personnel hors
+de tous les écrans, une panne totale déguisée en « fail closed ». `assignableRoles` et
+`managesAllRoles`, eux, échouent **fermé** (`[]` / `false`) : mieux vaut un bouton manquant
+qu'un bouton promettant un 403.
+
+> ⚠️ **`managesAllRoles` n'est pas une commodité.** `plafond >= tier(cible)` n'équivaut PAS à
+> « tous les rôles de la cible sont assignables » : l'équivalence tombe au plafond le plus
+> haut sur un rôle **inconnu**. `assignableRoles` ne liste que les rôles connus, donc un
+> `ROLE_MARS` n'y est jamais ; mais le tamis serveur ne filtre rien à ce plafond, et la fiche
+> est bien dans la collection du superviseur. Sans ce champ, il la verrait **sans aucun
+> bouton dessus**. Asservi en DEUX branches par
+> `tests/unit/composables/useUserCapabilities.spec.ts`.
+
+✅ **`useUserCapabilities.ts` ne transcrit plus le tier model.** `TARGET_TIER`,
+`ACTOR_CEILING`, `tierOfRoles()` et `ceilingOfRoles()` ont été **supprimés** le 10 septembre
+2026 : le backend calcule, le front consomme. La dette 🟡 de `ROADMAP.md` est **réduite** au
+seul résidu `PAGE_ROLES` (miroir de l'expression `security:` de `GetCollection`), **pas
+fermée**.
+
+**`ROLE_PRIORITY`** (`AppLayout.vue`) accueille `ROLE_SECRETARIAT` depuis le 10 septembre
+2026. ⚠ **L'ajout est fonctionnellement inerte en l'état** — un secrétariat déplié porte
+`ROLE_RESPONSABLE_PED`, qui vient avant et l'attrape. Il est là pour que la liste soit
+**complète** : à cinq entrées pour six rôles, elle redeviendrait fausse si la hiérarchie
+changeait. Ce qui change le comportement, c'est le dépliage, pas cette ligne.
 
 ### Guards dans `router/index.ts`
 - `router.beforeEach()` vérifie `auth.user` → redirige vers `/login` si non authentifié.

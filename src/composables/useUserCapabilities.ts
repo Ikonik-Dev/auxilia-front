@@ -3,44 +3,47 @@ import { useAuthStore } from '@/stores/auth'
 import type { UserUserRead } from '@/api'
 
 /**
- * ⚠ TROISIÈME COPIE DU TIER MODEL — ET LA SEULE QU'AUCUN TEST NE PEUT CONFRONTER.
+ * Capacités de gestion des comptes — Phase 17, étapes 4 puis 5.
  *
- * L'ORIGINAL EST LE BACKEND : `auxilia-api/src/Security/Voter/UserVoter.php`
- * (constantes `ACTOR_CEILING` et `TARGET_TIER`). Les deux tables ci-dessous en sont une
- * transcription. **Toute modification part de là, jamais d'ici.**
+ * ✅ **CE FICHIER NE TRANSCRIT PLUS LE TIER MODEL depuis le 10 septembre 2026.**
+ * Il portait `TARGET_TIER`, `ACTOR_CEILING`, `tierOfRoles()` et `ceilingOfRoles()` —
+ * une copie des tables de `auxilia-api/src/Security/Voter/UserVoter.php` dans un autre
+ * dépôt, que rien ne pouvait confronter à l'original. Les quatre ont été supprimés :
+ * le backend calcule désormais le plafond et transmet ses conséquences dans
+ * `/api/auth/me` (`assignableRoles`, `managesAllRoles`).
  *
- * Les deux autres copies vivent dans le même dépôt que l'original et sont confrontées à lui
- * par la suite PHPUnit (`UserVoterTest`, `ManageableUsersTest`). Celle-ci franchit une
- * frontière de dépôt : rien ne la vérifie automatiquement. C'est le même motif que
- * `CurrentUserQueryExtension.php:118-119` porte vis-à-vis de `DocumentVoter`, avec un cran
- * de risque en plus.
+ * Ce qui subsiste comme duplication, et qu'il ne faut pas se cacher : `PAGE_ROLES`
+ * ci-dessous est un miroir de l'expression `security:` de `GetCollection` sur `User.php`.
+ * C'est une duplication d'expression de rôles — du même ordre que les `meta.roles` des
+ * autres routes — pas une duplication de modèle de niveaux. La dette 🟡 de `ROADMAP.md`
+ * a été RÉDUITE à ce résidu, pas fermée.
  *
- * MODE DE PANNE — FAIL-SAFE, et il faut le savoir pour ne pas surestimer la dette :
- * si cette table dérive de l'originale, le front proposera un rôle ou un bouton que l'API
- * refusera en **403**. C'est laid, c'est un défaut d'ergonomie — **ce n'est pas une faille** :
- * l'autorisation est rendue par `UserVoter` et `UserStateProcessor`, jamais ici. Un écran
- * qui ment n'ouvre aucun droit.
- *
- * La suppression de cette copie est consignée en dette 🟡 dans `ROADMAP.md` : exposer
- * `assignableRoles` dans `/api/auth/me`.
+ * ── DEUX RÉGIMES, ET LE SECOND N'EST PAS UNE COMMODITÉ ──────────────────────────────
+ * `ceiling >= tier(cible)` n'équivaut PAS à « tous les rôles de la cible sont
+ * assignables ». L'équivalence tombe au plafond le plus haut, sur un rôle INCONNU :
+ * `assignableRoles` ne liste que les rôles connus, donc un `ROLE_MARS` n'y est jamais ;
+ * mais côté backend `tierOf()` le hisse au niveau 5, `5 >= 5` accorde, et
+ * `ManageableUsersExtension` ne filtre rien à ce plafond — la fiche EST dans la
+ * collection du superviseur. Sans `managesAllRoles`, il la verrait **sans aucun bouton
+ * dessus** : la seule personne habilitée à la gérer serait la seule à ne pas pouvoir agir.
+ * Asservi par `useUserCapabilities.spec.ts::roleInconnu…`, en DEUX branches.
  */
-const TARGET_TIER: Record<string, number> = {
-  ROLE_ADMIN:           5,
-  ROLE_DIRECTEUR:       4,
-  ROLE_SECRETARIAT:     3,
-  ROLE_RESPONSABLE_PED: 3,
-  ROLE_FORMATEUR:       2,
-  ROLE_USER:            1,
-}
 
-const ACTOR_CEILING: Record<string, number> = {
-  ROLE_ADMIN:           5,
-  ROLE_DIRECTEUR:       3,
-  ROLE_RESPONSABLE_PED: 2,
-  ROLE_SECRETARIAT:     1,
-  ROLE_FORMATEUR:       0, // aucun plafond général — périmètre traité à part, en lecture seule
-  ROLE_USER:            0,
-}
+/**
+ * Les rôles qui ont affaire à l'écran `/utilisateurs`.
+ *
+ * ⚠ Miroir de l'expression `security:` de `GetCollection` (`User.php`). Ce n'est PAS une
+ * question de plafond : `ROLE_FORMATEUR` y figure alors qu'il n'en a aucun — il voit ses
+ * stagiaires, le tamis serveur décide lesquels.
+ * Lu via `hasRole()`, donc sur les rôles EFFECTIFS : un directeur entre par héritage.
+ */
+const PAGE_ROLES = [
+  'ROLE_ADMIN',
+  'ROLE_DIRECTEUR',
+  'ROLE_SECRETARIAT',
+  'ROLE_RESPONSABLE_PED',
+  'ROLE_FORMATEUR',
+]
 
 /**
  * Libellés produit des rôles.
@@ -63,80 +66,51 @@ export const ROLE_LABELS: Record<string, string> = {
   ROLE_USER:            'Stagiaire',
 }
 
-/** Les 5 rôles qui ont affaire à l'écran — miroir de `GetCollection` sur `User.php`. */
-const PAGE_ROLES = [
-  'ROLE_ADMIN',
-  'ROLE_DIRECTEUR',
-  'ROLE_SECRETARIAT',
-  'ROLE_RESPONSABLE_PED',
-  'ROLE_FORMATEUR',
-]
-
-/** Niveau d'une fiche. Rôle inconnu ⇒ 5. Fail closed, comme `UserVoter::tierOf()`. */
-export function tierOfRoles(roles: Array<string | null> | undefined): number {
-  let tier = 1 // `getRoles()` garantit toujours ROLE_USER
-  for (const role of roles ?? []) {
-    if (role) tier = Math.max(tier, TARGET_TIER[role] ?? 5)
-  }
-  return tier
-}
-
-/** Plafond d'un acteur. Rôle inconnu ⇒ 0. Fail closed, comme `UserVoter::ceilingOfRoles()`. */
-export function ceilingOfRoles(roles: string[]): number {
-  return roles.reduce((max, role) => Math.max(max, ACTOR_CEILING[role] ?? 0), 0)
-}
-
 export function useUserCapabilities() {
   const auth = useAuthStore()
-
-  const ceiling = computed(() => ceilingOfRoles(auth.roles))
 
   const canOpenPage = computed(() => PAGE_ROLES.some((r) => auth.hasRole(r)))
 
   /** Miroir de `USER_CREATE` sans sujet : « peut créer au moins le niveau le plus bas ». */
-  const canCreate = computed(() => ceiling.value >= 1)
+  const canCreate = computed(() => auth.managesAllRoles || auth.assignableRoles.length > 0)
 
   const isSelf = (u: UserUserRead): boolean =>
     u.id != null && u.id === auth.user?.id
 
-  /** Miroir de `UserVoter::EDIT` — `isSelf || ceiling >= tier`. */
-  const canEdit = (u: UserUserRead): boolean =>
-    isSelf(u) || ceiling.value >= tierOfRoles(u.roles)
+  /**
+   * « Ce compte est-il dans mon périmètre de gestion ? » — les deux régimes du tamis.
+   * Le test de sous-ensemble est exactement celui du `JSON_CONTAINS` de
+   * `ManageableUsersExtension` ; `managesAllRoles` transcrit son `return` anticipé.
+   */
+  const gerable = (u: UserUserRead): boolean =>
+    auth.managesAllRoles
+    || (u.roles ?? []).every((r) => r !== null && auth.assignableRoles.includes(r))
 
-  /** Miroir de `UserVoter::DELETE` — `!isSelf && ceiling >= tier`. Personne ne se supprime. */
-  const canDelete = (u: UserUserRead): boolean =>
-    !isSelf(u) && ceiling.value >= tierOfRoles(u.roles)
+  /** Miroir de `UserVoter::EDIT` — `isSelf || plafond suffisant`. */
+  const canEdit = (u: UserUserRead): boolean => isSelf(u) || gerable(u)
+
+  /** Miroir de `UserVoter::DELETE` — personne ne supprime son propre compte. */
+  const canDelete = (u: UserUserRead): boolean => !isSelf(u) && gerable(u)
 
   /**
-   * Rôles proposables dans le formulaire : le plafond, UNION les rôles déjà portés.
+   * Rôles proposables dans le formulaire : ceux du serveur, UNION les rôles déjà portés.
    *
-   * ⚠ L'UNION EST OBLIGATOIRE, ET C'EST CONTRE-INTUITIF. Filtrer au seul plafond casserait
-   * l'AUTO-ÉDITION pour tout compte dont la fiche est de niveau supérieur à son plafond.
-   * C'est le cas de CINQ des six comptes de démo — directeur (4 > 3), resp. péda (3 > 2),
-   * secrétariat (3 > 1), formateur (2 > 0) et stagiaire (1 > 0) ; seul le superviseur y
-   * échappe (5 = 5). En pratique le formulaire n'en concerne que quatre : le stagiaire
-   * n'atteint pas cet écran, sa route étant fermée.
+   * ⚠ L'UNION EST OBLIGATOIRE, ET C'EST CONTRE-INTUITIF. Sans elle, l'auto-édition casse
+   * pour tout compte dont la fiche est de niveau supérieur à son plafond — CINQ des six
+   * comptes de démo (directeur, resp. péda, secrétariat, formateur et stagiaire ; seul le
+   * superviseur y échappe). En pratique le formulaire n'en concerne que quatre : le
+   * stagiaire n'atteint pas cet écran, sa route étant fermée.
    *
-   * Sans l'union, le `MultiSelect` recevrait une valeur absente de ses options, la perdrait
-   * au submit, et le payload deviendrait un CHANGEMENT de rôles que `UserStateProcessor`
-   * refuse en 403 — y compris pour un RETRAIT, qu'il contrôle symétriquement (`array_diff`
-   * dans les deux sens).
-   *
-   * C'est le pendant exact de la règle backend « les rôles inchangés passent toujours »
-   * (ROADMAP : « retenue des rôles existants en auto-édition autorisée »).
+   * Le `MultiSelect` recevrait une valeur absente de ses options, la perdrait au submit, et
+   * le payload deviendrait un CHANGEMENT de rôles que `UserStateProcessor` refuse en 403 —
+   * y compris pour un RETRAIT, qu'il contrôle symétriquement (`array_diff` dans les deux
+   * sens). C'est le pendant de la règle backend « les rôles inchangés passent toujours ».
    */
   const assignableRoles = (edited?: UserUserRead | null): string[] => {
-    // `tierOfRoles([r])` plutot que `TARGET_TIER[r]` : `noUncheckedIndexedAccess` rend
-    // l'acces indexe `number | undefined`, et surtout le `?? 5` du fail closed n'a alors
-    // qu'un seul endroit ou vivre.
-    const allowed = Object.keys(TARGET_TIER).filter((r) => tierOfRoles([r]) <= ceiling.value)
     const current = (edited?.roles ?? []).filter((r): r is string => r !== null)
 
-    // Dédoublonné, puis ordonné du niveau le plus élevé au plus bas.
-    return [...new Set([...allowed, ...current])].sort(
-      (a, b) => (TARGET_TIER[b] ?? 5) - (TARGET_TIER[a] ?? 5),
-    )
+    return [...new Set([...auth.assignableRoles, ...current])]
   }
 
-  return { ceiling, canOpenPage, canCreate, canEdit, canDelete, assignableRoles }
+  return { canOpenPage, canCreate, canEdit, canDelete, assignableRoles }
 }

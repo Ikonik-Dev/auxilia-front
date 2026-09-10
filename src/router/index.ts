@@ -35,11 +35,26 @@ export const router = createRouter({
             {
               path: '',
               name: 'dashboard',
+              // Phase 17 étape 5 (10 septembre 2026) — chaîne ORDONNÉE PAR NIVEAU
+              // DÉCROISSANT, et non plus par l'ordre où les cas ont été ajoutés.
+              //
+              // ⚠ Ce que l'ordre corrige : depuis que `hasRole()` lit les rôles EFFECTIFS,
+              // un directeur porte ROLE_FORMATEUR (il en hérite) et un secrétariat porte
+              // ROLE_RESPONSABLE_PED. L'ancienne chaîne testait FORMATEUR avant
+              // RESPONSABLE_PED — un ordre sans conséquence tant que rien n'était déplié,
+              // et un piège dès que ça l'est. Le premier `if` masquait le défaut ; il ne
+              // faut pas s'en remettre à lui.
+              //
+              // ⚠ COUPLAGE — cette chaîne et le guard `meta.roles` (:186) changent
+              // ENSEMBLE. Rediriger un secrétariat vers `/dashboard/responsable` sans que
+              // le guard de cette route l'accepte le renverrait aussitôt vers `forbidden` :
+              // une redirection vers une porte fermée. Ici c'est le dépliage qui ouvre les
+              // deux d'un coup, ROLE_RESPONSABLE_PED étant hérité.
               redirect: () => {
                 const auth = useAuthStore()
                 if (auth.hasRole('ROLE_ADMIN') || auth.hasRole('ROLE_DIRECTEUR')) return '/dashboard/directeur'
-                if (auth.hasRole('ROLE_FORMATEUR')) return '/dashboard/formateur'
                 if (auth.hasRole('ROLE_RESPONSABLE_PED')) return '/dashboard/responsable'
+                if (auth.hasRole('ROLE_FORMATEUR')) return '/dashboard/formateur'
                 return '/dashboard/stagiaire'
               },
             },
