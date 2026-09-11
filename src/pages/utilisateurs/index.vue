@@ -1,5 +1,5 @@
 ﻿<script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 // `useAuthStore` n'est plus importe ici : la page ne lit plus les roles elle-meme,
 // `useUserCapabilities` encapsule cette lecture (et la table de niveaux qui va avec).
 import { useUserCapabilities, ROLE_LABELS } from '@/composables/useUserCapabilities'
@@ -19,7 +19,7 @@ import { useToast } from 'primevue/usetoast'
 import Toast from 'primevue/toast'
 
 const toast = useToast()
-const { utilisateurs, loading, error, fetchUtilisateurs, createUser, updateUser, deleteUser } = useUtilisateurs()
+const { utilisateurs, total, loading, error, fetchUtilisateurs, createUser, updateUser, deleteUser } = useUtilisateurs()
 
 // Phase 17 etape 4 — capacites par cible, miroir de UserVoter.
 //
@@ -34,7 +34,7 @@ onMounted(() => {
   document.title = 'Utilisateurs — Auxilium'
   // ⚠ Le fetch suit la MEME condition que le `v-if` du template. Les desynchroniser
   // rouvrirait le defaut d'aujourd'hui a l'envers : page ouverte, liste jamais demandee.
-  if (canOpenPage.value) fetchUtilisateurs()
+  if (canOpenPage.value) void recharger()
 })
 
 // ── Filtres ──
@@ -63,18 +63,86 @@ const statusOptions = [
   { label: 'Inactifs', value: 'inactive' },
 ]
 
-const filtered = computed(() => {
-  let list = utilisateurs.value
-  const q = search.value.trim().toLowerCase()
-  if (q) list = list.filter((u) =>
-    u.firstName.toLowerCase().includes(q) ||
-    u.lastName.toLowerCase().includes(q) ||
-    u.email.toLowerCase().includes(q),
-  )
-  if (filterRole.value !== 'all') list = list.filter((u) => u.roles.includes(filterRole.value))
-  if (filterStatus.value === 'active')   list = list.filter((u) => u.isActive)
-  if (filterStatus.value === 'inactive') list = list.filter((u) => !u.isActive)
-  return list
+// ── Pagination SERVEUR — 11 septembre 2026 (chantier A) ─────────────────────────────────
+//
+// ⚠ LE `computed` `filtered` QUI VIVAIT ICI A ÉTÉ SUPPRIMÉ, ET C'EST LE CŒUR DU CHANTIER.
+// Il filtrait `utilisateurs.value`, c'est-à-dire LA LISTE REÇUE. Tant que l'écran recevait
+// la collection entière, c'était incomplet mais honnête. Sur une page de 30, un filtre
+// client ne voit plus que la page courante : chercher « Benali » depuis la page 1 aurait
+// répondu « aucun résultat » pour une fiche existant page 2. Les quatre filtres sont
+// désormais des paramètres de requête, résolus en SQL, sur la collection entière.
+const first = ref(0)
+const rows = ref(20)
+const premierChargement = ref(true)
+
+function requete() {
+  return {
+    page: Math.floor(first.value / rows.value) + 1,
+    itemsPerPage: rows.value,
+    q: search.value.trim() || undefined,
+    roles: filterRole.value === 'all' ? undefined : filterRole.value,
+    isActive: filterStatus.value === 'all' ? undefined : filterStatus.value === 'active',
+  }
+}
+
+async function recharger() {
+  await fetchUtilisateurs(requete())
+
+  // ⚠ Même famille de bug que la remise à la page 1 ci-dessous : supprimer la dernière
+  // fiche de la dernière page laisserait `first` au-delà du nouveau total, donc un tableau
+  // vide alors qu'il reste des fiches. On recule d'une page. Une seule reprise, bornée.
+  if (utilisateurs.value.length === 0 && total.value > 0 && first.value > 0) {
+    first.value = Math.max(0, first.value - rows.value)
+    await fetchUtilisateurs(requete())
+  }
+
+  premierChargement.value = false
+}
+
+/**
+ * ⚠ REMISE À LA PAGE 1 À CHAQUE CHANGEMENT DE FILTRE — sinon l'écran se contredit tout seul.
+ * En `lazy`, le `DataTable` conserve son `first`. Depuis la page 2 (`first = 30`), une
+ * recherche qui ne rend que 5 résultats demanderait l'offset 30 d'une collection de 5 : un
+ * tableau VIDE pendant que `CurrentPageReport` annonce « 5 résultats ».
+ */
+function filtrer() {
+  first.value = 0
+  void recharger()
+}
+
+function onPage(evenement: { first: number; rows: number }) {
+  first.value = evenement.first
+  rows.value = evenement.rows
+  void recharger()
+}
+
+/**
+ * Debounce sur la SEULE recherche : un aller-retour par frappe sinon. Rôle et statut partent
+ * immédiatement — un clic dans une liste déroulante est délibéré, le retarder paraît lent.
+ * ⚠ Le debounce espace les requêtes, il ne les ordonne pas : la garde contre les réponses
+ * arrivées dans le désordre est le jeton de `useUtilisateurs`, pas ce minuteur.
+ * (Aucun limiteur de débit ne couvre `/api/users` — les cinq déclarés visent login,
+ * inscription, soumission, message et tableaux de bord. Ce délai est pour la charge.)
+ */
+let minuteur: ReturnType<typeof setTimeout> | null = null
+watch(search, () => {
+  if (minuteur !== null) clearTimeout(minuteur)
+  minuteur = setTimeout(filtrer, 300)
+})
+watch([filterRole, filterStatus], filtrer)
+
+onBeforeUnmount(() => {
+  if (minuteur !== null) clearTimeout(minuteur)
+})
+
+/**
+ * Annoncé dans une région `aria-live` : après un filtre, un lecteur d'écran ne doit pas
+ * avoir à parcourir le tableau pour savoir combien de fiches restent. Porte de qualité n°4.
+ */
+const resultatAnnonce = computed(() => {
+  if (loading.value) return ''
+  if (total.value === 0) return 'Aucun utilisateur ne correspond aux filtres.'
+  return total.value === 1 ? '1 utilisateur trouvé.' : `${total.value} utilisateurs trouvés.`
 })
 
 // ── Helpers ──
@@ -95,8 +163,26 @@ const ROLE_SEVERITY: Record<string, 'danger' | 'warn' | 'info' | 'secondary'> = 
   ROLE_USER:            'secondary',
 }
 
+/**
+ * ⚠ `ROLE_USER` EST RETIRÉ DÈS QU'UN AUTRE RÔLE CONNU EST PRÉSENT — décision PRODUIT du
+ * 11 septembre 2026, pas un détail d'affichage.
+ *
+ * `User::getRoles()` rend `array_unique(array_merge($this->roles, ['ROLE_USER']))` : l'API
+ * sérialise donc `ROLE_USER` sur les 53 fiches, alors que 41 seulement le portent en base.
+ * La ligne du directeur affichait par conséquent DEUX badges, « Directeur » ET « Stagiaire ».
+ *
+ * Le filtre par rôle est passé côté serveur et interroge la colonne brute : « Stagiaire »
+ * rend désormais 41 fiches, et non 53. Garder le badge ferait cohabiter un « Stagiaire »
+ * visible sur la ligne du directeur avec un filtre « Stagiaire » qui ne la retrouve pas —
+ * l'écran se contredirait. Badge et filtre disent maintenant la même chose.
+ *
+ * Une fiche qui n'a QUE `ROLE_USER` garde évidemment son badge : le filtre ne s'applique
+ * qu'en présence d'un second rôle connu.
+ */
 function displayRoles(roles: Array<string | null>) {
-  return roles.filter((r): r is string => r !== null && KNOWN_ROLES.includes(r))
+  const connus = roles.filter((r): r is string => r !== null && KNOWN_ROLES.includes(r))
+
+  return connus.length > 1 ? connus.filter((r) => r !== 'ROLE_USER') : connus
 }
 
 function formatDate(iso: string | null | undefined): string {
@@ -134,7 +220,7 @@ async function handleSubmit(payload: UserFormPayload) {
       toast.add({ severity: 'success', summary: 'Utilisateur créé', life: 3000 })
     }
     showForm.value = false
-    await fetchUtilisateurs()
+    await recharger()
   } catch (erreur) {
     // Le composable remonte le motif réel (violation de validation, refus de droits).
     // Un message générique rendait un email déjà pris indiscernable d'un 403.
@@ -165,7 +251,7 @@ async function handleDelete() {
   if (ok) {
     toast.add({ severity: 'success', summary: 'Utilisateur supprimé', life: 3000 })
     showDeleteConfirm.value = false
-    await fetchUtilisateurs()
+    await recharger()
   } else {
     toast.add({ severity: 'error', summary: 'Suppression impossible', life: 4000 })
     showDeleteConfirm.value = false
@@ -198,8 +284,13 @@ async function handleDelete() {
       <i class="pi pi-exclamation-triangle" aria-hidden="true" /> {{ error }}
     </div>
 
-    <!-- Chargement -->
-    <div v-else-if="loading" class="list-skeleton" aria-label="Chargement des utilisateurs">
+    <!-- Chargement INITIAL seulement.
+         ⚠ `v-else-if="loading"` tout court remplacerait aussi les FILTRES par des squelettes
+         à chaque frappe : le champ de recherche serait démonté puis remonté, et perdrait le
+         focus au milieu d'un mot. Depuis le passage en pagination serveur, `loading` bascule
+         à chaque requête, pas seulement à l'ouverture — les chargements suivants passent donc
+         par `:loading` du DataTable, qui superpose sans démonter. -->
+    <div v-else-if="premierChargement && loading" class="list-skeleton" aria-label="Chargement des utilisateurs">
       <Skeleton v-for="i in 6" :key="i" height="2.75rem" border-radius="10px" />
     </div>
 
@@ -230,13 +321,29 @@ async function handleDelete() {
         />
       </div>
 
+      <!-- Le compte, annoncé aux lecteurs d'écran sans qu'ils aient à parcourir le tableau.
+           Même motif que le bloc d'erreur ci-dessus. Porte de qualité n°4. -->
+      <p class="sr-only" role="status" aria-live="polite">{{ resultatAnnonce }}</p>
+
+      <!-- ⚠ `lazy` : le paginateur ne feuillette plus les lignes reçues, il DEMANDE une page.
+           Les trois attributs vont ensemble et se cassent séparément —
+           `:total-records` sans `lazy` paginerait toujours en client ; `lazy` sans `@page`
+           figerait l'écran sur la page 1 ; `lazy` sans `:total-records` annoncerait une
+           seule page. -->
       <DataTable
-        :value="filtered"
+        :value="utilisateurs"
+        lazy
         paginator
-        :rows="20"
+        :first="first"
+        :rows="rows"
+        :total-records="total"
+        :loading="loading"
         :rows-per-page-options="[10, 20, 50]"
+        paginator-template="CurrentPageReport FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
+        current-page-report-template="{first}–{last} sur {totalRecords}"
         aria-label="Liste des utilisateurs"
         class="glass-table"
+        @page="onPage"
       >
         <template #empty>
           <div class="empty-state">
@@ -515,5 +622,19 @@ async function handleDelete() {
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
+}
+
+/* Visible des seuls lecteurs d'ecran. Repris de DirecteurDashboard.vue:448, ou il est
+   egalement scoped — il n'existe pas de definition globale dans App.vue. A remonter en
+   global le jour ou un troisieme ecran en aura besoin. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 </style>

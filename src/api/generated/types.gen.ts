@@ -6724,6 +6724,19 @@ export type ApiUsersGetCollectionData = {
          * The collection page number
          */
         page?: number;
+        /**
+         * The number of items per page
+         */
+        itemsPerPage?: number;
+        /**
+         * Recherche partielle, insensible a la casse, sur le prenom OU le nom OU l'email.
+         */
+        q?: string;
+        /**
+         * Ne garde que les fiches portant CE role dans leur colonne `roles`.
+         */
+        roles?: string;
+        isActive?: boolean;
     };
     url: '/api/users';
 };

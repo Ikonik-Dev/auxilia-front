@@ -373,14 +373,58 @@ rendue, mais chaque bouton suit la capacité **de sa ligne**. Vérifié à l'éc
 2026 : un formateur voit ses stagiaires **sans crayon**, et le seul crayon de sa liste est
 sur sa propre fiche. Personne n'a de corbeille sur sa propre ligne.
 
-> 🟠 **L'écran ne montre que 30 fiches au maximum, et rien ne le dit.**
-> `useUtilisateurs.fetchUtilisateurs()` ne demande que la page 1, et l'API pagine à 30
-> (`api_platform.yaml`). Le paginateur du `DataTable` est **client** : il feuillette les
-> 30 lignes reçues, pas la collection. Mesuré le 9 septembre 2026 — le superviseur voit
-> **30** fiches là où l'API en accorde 53, le directeur 30 pour 51, le resp. péda 30 pour 48,
-> le secrétariat 30 pour 42. Les formateurs (18 et 20) sont sous le plafond et complets.
-> Défaut **préexistant** — il ne touchait qu'un compte quand la page était réservée au
-> superviseur ; l'étape 4 l'étend à quatre. Dette consignée dans `ROADMAP.md`.
+> ✅ **`/utilisateurs` est en PAGINATION SERVEUR depuis le 11 septembre 2026 (chantier A).**
+> `DataTable` en `lazy` + `@page` + `:total-records`, et **les quatre filtres sont passés
+> côté serveur** — ils étaient devenus obligatoires, pas optionnels : sur une page de 30, un
+> filtre client ne voit que la page courante et répondrait « aucun résultat » pour une fiche
+> existant page 2.
+>
+> **Mesuré à l'écran, six comptes, le 11 septembre 2026** (le total est désormais AFFICHÉ,
+> `CurrentPageReport` ayant été ajouté au gabarit — il n'y en avait aucun dans tout `src/`) :
+>
+> | Compte | Affiché | | Compte | Affiché |
+> |---|---|---|---|---|
+> | `superviseur@` | `1–20 sur 53` | | `secretariat@` | `1–20 sur 42` |
+> | `directeur@` | `1–20 sur 51` | | `formateur2@` | `1–20 sur 20` |
+> | `respeda@` | `1–20 sur 48` | | `formateur@` | `1–18 sur 18` |
+>
+> Recherche d'une fiche **située hors de la première page** → `1–1 sur 1`, la bonne fiche.
+> Filtrage **depuis la page 2** → retour à `1–1 sur 1`, pas un tableau vide.
+>
+> 🔴 **DEUX CHANGEMENTS VISIBLES, assumés, à ne pas lire comme des régressions :**
+> 1. le filtre **« Stagiaire » rend 41 fiches et non 53**. Il interroge la colonne brute ;
+>    le filtre client lisait `getRoles()`, qui ajoute `ROLE_USER` à tout le monde — il ne
+>    filtrait donc rien ;
+> 2. **la ligne du directeur n'affiche plus de badge « Stagiaire »** (`displayRoles()` retire
+>    `ROLE_USER` dès qu'un autre rôle connu est présent). Sans cela, un badge visible ne
+>    serait pas retrouvé par le filtre du même nom : l'écran se contredirait.
+>
+> 🔴 **`Accept: application/ld+json` EST POSÉ PAR APPEL, JAMAIS DANS `client.ts`.** Seule
+> cette forme porte `totalItems` ; `*/*` rend un tableau nu. Mais le SDK généré déclare
+> `ApiUsersGetCollectionResponses = { 200: Array<UserUserRead> }` **inconditionnellement** —
+> le type ne dépend pas de l'en-tête. Poser cet `Accept` globalement changerait donc la forme
+> reçue par les **onze** composables **sans une seule erreur de `vue-tsc`**, et onze écrans
+> afficheraient des listes vides en silence. D'où la garde d'exécution `estCollectionLd()`
+> dans `useUtilisateurs`, asservie par `tests/unit/composables/useUtilisateurs.spec.ts`.
+>
+> ⚠ **Un jeton monotone protège des réponses arrivées dans le désordre** — le debounce (300 ms
+> sur la recherche seule) espace les requêtes, il ne les ordonne pas. Mutation vérifiée :
+> sans le jeton, une réponse périmée écrase la fraîche et l'écran affiche 41 résultats sous
+> un champ qui en annonce 1.
+>
+> ⚠ **Énoncé caduc depuis le 11 septembre 2026, conservé et daté :** « 🟠 **L'écran ne montre
+> que 30 fiches au maximum, et rien ne le dit.** `useUtilisateurs.fetchUtilisateurs()` ne
+> demande que la page 1, et l'API pagine à 30 (`api_platform.yaml`). Le paginateur du
+> `DataTable` est **client** : il feuillette les 30 lignes reçues, pas la collection. Mesuré
+> le 9 septembre 2026 — le superviseur voit **30** fiches là où l'API en accorde 53, le
+> directeur 30 pour 51, le resp. péda 30 pour 48, le secrétariat 30 pour 42. Les formateurs
+> (18 et 20) sont sous le plafond et complets. »
+>
+> 🟠 **CE DÉFAUT SUBSISTE SUR QUATRE AUTRES ÉCRANS**, et il n'y est pas corrigé :
+> `/inscriptions` (47 fiches, **17 invisibles**), `/evaluations` (55, **25**), `/assiduite`
+> (93, **63**), `/parcours` (`lessons` 116, latent car filtré par formation). `modules` est à
+> **29 / 30** — une ligne avant de rejoindre la liste, en silence. Aucun des 9 `DataTable` du
+> front n'a `lazy` hors `/utilisateurs`. Détail chiffré dans `../ROADMAP.md`.
 
 > ✅ **`hasRole()` LIT LES RÔLES EFFECTIFS depuis le 10 septembre 2026** (Phase 17 étape 5).
 > `/api/auth/me` rend désormais `grantedRoles`, déplié **côté serveur** par

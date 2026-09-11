@@ -10,6 +10,38 @@ import type { UserUserRead, UserUserWrite, UserUserWriteJsonMergePatch } from '@
  */
 export type UserFormPayload = UserUserWriteJsonMergePatch
 
+/** Ce que l'écran demande au serveur. Tout est optionnel : rien n'est un filtre par défaut. */
+export interface RequeteUtilisateurs {
+  page?: number
+  itemsPerPage?: number
+  /** Recherche partielle sur prénom OU nom OU email. */
+  q?: string
+  /** Rôle EXACT tel qu'il est stocké en base — `ROLE_USER` ne désigne donc que les stagiaires. */
+  roles?: string
+  isActive?: boolean
+}
+
+/**
+ * Forme réelle d'une collection `application/ld+json`.
+ *
+ * ⚠ ÉCRITE À LA MAIN PARCE QUE LE SDK NE LA CONNAÎT PAS. `types.gen.ts` déclare
+ * `ApiUsersGetCollectionResponses = { 200: Array<UserUserRead> }` — inconditionnellement,
+ * sans égard pour l'en-tête `Accept`. Le générateur ne retient qu'un seul type de contenu.
+ */
+interface CollectionLd<T> {
+  member: T[]
+  totalItems: number
+}
+
+function estCollectionLd<T>(valeur: unknown): valeur is CollectionLd<T> {
+  return (
+    typeof valeur === 'object' &&
+    valeur !== null &&
+    Array.isArray((valeur as { member?: unknown }).member) &&
+    typeof (valeur as { totalItems?: unknown }).totalItems === 'number'
+  )
+}
+
 /**
  * Sur 422, API Platform renvoie une `ConstraintViolationList` ; sur 403, un `detail`.
  * Sans cette extraction, l'écran affichait un message générique pour tout code d'erreur
@@ -31,20 +63,69 @@ function motifDeRefus(apiError: unknown, repli: string): string {
 
 export function useUtilisateurs() {
   const utilisateurs = ref<UserUserRead[]>([])
+  /** Nombre total de fiches du périmètre APRÈS filtrage — la source du paginateur. */
+  const total = ref(0)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  async function fetchUtilisateurs(page = 1) {
+  /**
+   * Jeton monotone contre les réponses arrivées dans le désordre.
+   *
+   * ⚠ LE DEBOUNCE NE SUFFIT PAS, et c'est une erreur courante de croire le contraire : il
+   * ESPACE les requêtes, il ne les SÉRIALISE pas. Une requête « ben » lente et une requête
+   * « benali » rapide peuvent revenir dans cet ordre ; l'écran afficherait alors les
+   * résultats de « ben » — avec SON total — sous un champ qui affiche « benali ». Un écran
+   * qui ment, deuxième forme, après celle que ce chantier corrige.
+   */
+  let jeton = 0
+
+  async function fetchUtilisateurs(requete: RequeteUtilisateurs = {}) {
+    const moi = ++jeton
     loading.value = true
     error.value = null
+
+    // Un paramètre absent n'est pas un filtre : on ne l'envoie pas du tout.
+    const query: Record<string, string | number | boolean> = { page: requete.page ?? 1 }
+    if (requete.itemsPerPage !== undefined) query.itemsPerPage = requete.itemsPerPage
+    if (requete.q !== undefined && requete.q !== '') query.q = requete.q
+    if (requete.roles !== undefined && requete.roles !== '') query.roles = requete.roles
+    if (requete.isActive !== undefined) query.isActive = requete.isActive
+
     try {
-      const { data, error: apiError } = await apiUsersGetCollection({ query: { page } })
-      if (apiError) error.value = 'Impossible de charger les utilisateurs.'
-      else utilisateurs.value = data ?? []
+      const { data, error: apiError } = await apiUsersGetCollection({
+        query,
+        // ⚠ PAR APPEL, JAMAIS DANS `client.ts`. Poser cet en-tête globalement changerait la
+        // forme de TOUTES les collections — d'un tableau nu à `{ member, totalItems }` — et
+        // les onze composables se mettraient à afficher des listes vides SANS UNE SEULE
+        // ERREUR DE COMPILATION, puisque tous les types générés annoncent des tableaux.
+        headers: { Accept: 'application/ld+json' },
+      })
+
+      // ⚠ AVANT TOUTE ÉCRITURE, `loading` compris (cf. le `finally`). Relâcher `loading`
+      // depuis une réponse périmée éteindrait `aria-busy` alors qu'un chargement court.
+      if (moi !== jeton) return
+
+      if (apiError) {
+        error.value = 'Impossible de charger les utilisateurs.'
+        return
+      }
+
+      // ⚠ LE TYPE GÉNÉRÉ A TORT ICI : il annonce `Array<UserUserRead>` parce que le
+      // générateur n'a retenu qu'un seul type de contenu, alors que c'est l'en-tête `Accept`
+      // ci-dessus qui décide de la forme. `vue-tsc` ne peut pas voir cette rupture — le type
+      // ment, il n'échoue pas. Cette garde la transforme en erreur visible.
+      if (!estCollectionLd<UserUserRead>(data)) {
+        error.value = 'Réponse inattendue du serveur (format de collection).'
+        return
+      }
+
+      utilisateurs.value = data.member
+      total.value = data.totalItems
     } catch {
+      if (moi !== jeton) return
       error.value = 'Impossible de charger les utilisateurs.'
     } finally {
-      loading.value = false
+      if (moi === jeton) loading.value = false
     }
   }
 
@@ -73,5 +154,5 @@ export function useUtilisateurs() {
     return !apiError
   }
 
-  return { utilisateurs, loading, error, fetchUtilisateurs, createUser, updateUser, deleteUser }
+  return { utilisateurs, total, loading, error, fetchUtilisateurs, createUser, updateUser, deleteUser }
 }

@@ -5,13 +5,25 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const apiUsersIdPatch = vi.fn()
 const apiUsersIdPut = vi.fn()
 const apiUsersPost = vi.fn()
+const apiUsersGetCollection = vi.fn()
 
 vi.mock('@/api', () => ({
-  apiUsersGetCollection: vi.fn().mockResolvedValue({ data: [] }),
+  apiUsersGetCollection: (...args: unknown[]) => apiUsersGetCollection(...args),
   apiUsersPost: (...args: unknown[]) => apiUsersPost(...args),
   apiUsersIdPatch: (...args: unknown[]) => apiUsersIdPatch(...args),
   apiUsersIdDelete: vi.fn().mockResolvedValue({ error: undefined }),
 }))
+
+/** Une collection `application/ld+json` telle que l'API la rend réellement. */
+function collectionLd(nombre: number, total = nombre) {
+  return {
+    data: {
+      member: Array.from({ length: nombre }, (_, i) => ({ id: i + 1, email: `u${i}@test.local` })),
+      totalItems: total,
+    },
+    error: undefined,
+  }
+}
 
 import { useUtilisateurs } from '@/composables/useUtilisateurs'
 
@@ -95,5 +107,90 @@ describe('useUtilisateurs — édition', () => {
     await expect(updateUser(7, { firstName: 'X' })).rejects.toThrow(
       'Impossible de modifier l\'utilisateur.',
     )
+  })
+})
+
+/**
+ * Chantier A — la collection paginée côté serveur (11 septembre 2026).
+ *
+ * ⚠ CES TESTS EXISTENT PARCE QUE `vue-tsc` NE PEUT RIEN VOIR ICI. Le SDK généré déclare
+ * `ApiUsersGetCollectionResponses = { 200: Array<UserUserRead> }` — inconditionnellement,
+ * quel que soit l'en-tête `Accept`. Demander du `ld+json` change la forme réelle de la
+ * réponse sans changer son type : le type ment, il n'échoue pas. Le compilateur laisserait
+ * donc passer une régression qui viderait l'écran. Ces tests sont le seul filet.
+ */
+describe('useUtilisateurs — collection paginée', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    apiUsersGetCollection.mockResolvedValue(collectionLd(30, 53))
+  })
+
+  it('demande explicitement la forme ld+json, seule à porter totalItems', async () => {
+    const { fetchUtilisateurs } = useUtilisateurs()
+    await fetchUtilisateurs()
+
+    const appel = apiUsersGetCollection.mock.calls[0]?.[0] as { headers?: Record<string, string> }
+    expect(appel.headers?.Accept).toBe('application/ld+json')
+  })
+
+  it('déplie member et totalItems', async () => {
+    const { utilisateurs, total, fetchUtilisateurs } = useUtilisateurs()
+    await fetchUtilisateurs()
+
+    expect(utilisateurs.value).toHaveLength(30)
+    expect(total.value).toBe(53)
+  })
+
+  /**
+   * La garde d'exécution. Si quelqu'un retire l'en-tête `Accept` — ou le pose globalement
+   * dans `client.ts`, ce qui reviendrait au même pour les onze autres composables — l'API
+   * rend un TABLEAU NU. Sans cette garde, l'écran afficherait une liste vide en silence.
+   */
+  it('signale une réponse de forme inattendue au lieu d\'afficher une liste vide', async () => {
+    apiUsersGetCollection.mockResolvedValue({ data: [{ id: 1 }], error: undefined })
+
+    const { utilisateurs, error, fetchUtilisateurs } = useUtilisateurs()
+    await fetchUtilisateurs()
+
+    expect(error.value).toMatch(/format de collection/)
+    expect(utilisateurs.value).toHaveLength(0)
+  })
+
+  /**
+   * ⚠ LE TEST QUI PORTE LE JETON. Le debounce espace les requêtes, il ne les ordonne pas :
+   * une recherche « ben » lente et une recherche « benali » rapide peuvent revenir dans cet
+   * ordre. Sans le jeton, l'écran afficherait les résultats de « ben » — et SON total — sous
+   * un champ affichant « benali ».
+   */
+  it('ignore une réponse périmée revenue après une plus récente', async () => {
+    let resoudreLaLente: (v: unknown) => void = () => {}
+    const lente = new Promise((resoudre) => { resoudreLaLente = resoudre })
+
+    apiUsersGetCollection
+      .mockReturnValueOnce(lente)                       // partie en 1re, reviendra en 2e
+      .mockResolvedValueOnce(collectionLd(1, 1))        // partie en 2e, revient tout de suite
+
+    const { total, loading, fetchUtilisateurs } = useUtilisateurs()
+
+    const perimee = fetchUtilisateurs({ q: 'ben' })
+    await fetchUtilisateurs({ q: 'benali' })
+
+    expect(total.value).toBe(1)
+
+    resoudreLaLente(collectionLd(30, 41))
+    await perimee
+
+    expect(total.value).toBe(1)
+    expect(loading.value).toBe(false)
+  })
+
+  it('n\'envoie que les filtres réellement renseignés', async () => {
+    const { fetchUtilisateurs } = useUtilisateurs()
+    await fetchUtilisateurs({ page: 2, itemsPerPage: 20, q: '', roles: undefined, isActive: false })
+
+    const query = (apiUsersGetCollection.mock.calls[0]?.[0] as { query: Record<string, unknown> }).query
+    expect(query).toEqual({ page: 2, itemsPerPage: 20, isActive: false })
+    expect(query).not.toHaveProperty('q')
+    expect(query).not.toHaveProperty('roles')
   })
 })
