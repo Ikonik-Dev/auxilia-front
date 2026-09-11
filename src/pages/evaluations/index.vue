@@ -21,8 +21,16 @@ import Toast from 'primevue/toast'
 
 const auth = useAuthStore()
 const toast = useToast()
-const { evaluations, pendingGrading, loading, error, fetchEvaluations, gradeSubmission } =
-  useEvaluations()
+const {
+  evaluations,
+  pendingGrading,
+  loading,
+  error,
+  erreurCopies,
+  lectureCopiesReussie,
+  fetchEvaluations,
+  gradeSubmission,
+} = useEvaluations()
 
 const activeTab = ref('evaluations')
 const canGrade = computed(() =>
@@ -49,6 +57,21 @@ function getEvalTitle(iri: string | null | undefined): string {
   return evalMap.value.get(iri) ?? `#${iri.split('/').pop()}`
 }
 
+/**
+ * ⚠ CETTE FONCTION N'EST JUSTE QUE PARCE QUE `/api/evaluations` REND 12 SUR 12.
+ *
+ * Elle borne la saisie de la note en DEUX endroits — la validation de `handleGrade` et
+ * l'attribut `:max` du champ `InputNumber` — et elle retombe SILENCIEUSEMENT sur 100
+ * quand le `find()` échoue.
+ *
+ * Paginer cette collection créerait donc un défaut qui n'existe pas aujourd'hui : une
+ * évaluation située au-delà de la page serait introuvable, `parseFloat('100')`
+ * deviendrait le barème, et une note de 90 serait acceptée sur un devoir noté sur 20 —
+ * sans une seule erreur, ni à la compilation ni à l'exécution.
+ *
+ * Si cette collection dépasse un jour 30 éléments, c'est CE repli qu'il faut traiter en
+ * premier, avant le tableau.
+ */
 function getEvalMaxScore(iri: string | null | undefined): number {
   if (!iri) return 100
   const ev = evaluations.value.find((e) => `/api/evaluations/${e.id}` === iri)
@@ -180,7 +203,12 @@ async function handleGrade() {
         </Tab>
         <Tab v-if="canGrade" value="pending" aria-controls="panel-pending">
           À noter
-          <span v-if="pendingGrading.length > 0" class="tab-badge">
+          <!--
+            Le badge n'est rendu que si la file a été lue EN ENTIER. Sinon il annoncerait
+            le compte d'une page au lieu de celui de la file — c'est très exactement le
+            « 1 » qui masquait 5 copies.
+          -->
+          <span v-if="lectureCopiesReussie && pendingGrading.length > 0" class="tab-badge">
             {{ pendingGrading.length }}
           </span>
         </Tab>
@@ -253,13 +281,37 @@ async function handleGrade() {
 
         <!-- ── Onglet : À noter ── -->
         <TabPanel v-if="canGrade" id="panel-pending" value="pending">
+          <!--
+            ÉTAT « LECTURE EN ÉCHEC » — role="alert" et non aria-live="polite" : ce n'est
+            pas une annonce de résultat, c'est l'aveu qu'on ne sait pas. Le tableau n'est
+            pas rendu du tout, donc la phrase « Tout est noté » est inatteignable ici.
+          -->
+          <div v-if="erreurCopies" role="alert" class="dash-error">
+            <i class="pi pi-exclamation-triangle" aria-hidden="true" /> {{ erreurCopies }}
+          </div>
+
           <DataTable
+            v-else
             :value="pendingGrading"
             paginator
             :rows="20"
             aria-label="Soumissions en attente de notation"
             class="glass-table"
           >
+            <!--
+              ⚠ INVARIANT — NE PAS RÉTABLIR ICI UNE CONDITION SUR UN TOTAL.
+              `lireCollectionComplete` garantit `membres.length === total` : une fois la
+              lecture réussie, un tableau vide PROUVE que le serveur en annonce zéro. Il
+              n'y a donc pas de second nombre à lire, et la bonne question n'est pas
+              « le total vaut-il 0 ? » mais « la lecture a-t-elle réussi ? » — tranchée
+              par le `v-if` ci-dessus.
+
+              C'est ce qui rend cette phrase VRAIE. Avant le 12 septembre 2026 elle
+              s'affichait dès que la page reçue était vide : le badge annonçait 1 copie
+              pour 5 réelles, et noter la seule visible faisait dire à l'écran « Tout est
+              noté » pendant que quatre copies attendaient. Un écran qui dit « il n'y a
+              rien » dit au correcteur d'arrêter de chercher.
+            -->
             <template #empty>
               <div class="empty-state">
                 <i class="pi pi-check-circle" style="color: #86efac" />

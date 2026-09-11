@@ -3678,6 +3678,8 @@ export type ApiEvaluationSubmissionsGetCollectionData = {
          * The collection page number
          */
         page?: number;
+        status?: string;
+        'status[]'?: Array<string>;
     };
     url: '/api/evaluation_submissions';
 };
