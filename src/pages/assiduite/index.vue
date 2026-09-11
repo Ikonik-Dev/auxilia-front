@@ -18,8 +18,10 @@ const {
   participants,
   selectedSchedule,
   loading,
-  loadingAttendances,
+  chargementFeuille,
   error,
+  erreurFeuille,
+  feuilleEcrivable,
   fetchSchedules,
   selectSchedule,
   saveBatch,
@@ -59,6 +61,13 @@ const STATUS_LABELS: Record<string, string> = {
 const localStatuses = ref(new Map<string, string>())
 const isDirty = computed(() => localStatuses.value.size > 0)
 
+/**
+ * ⚠ UN ÉCRAN QUI SAIT SA FEUILLE INCOMPLÈTE NE DOIT PAS OFFRIR D'ENREGISTRER.
+ * C'est le point du chantier : avant, il proposait le bouton, créait des doublons, et
+ * rangeait les HTTP 500 dans un compteur d'erreurs.
+ */
+const peutEnregistrer = computed(() => isDirty.value && feuilleEcrivable.value)
+
 // Init local statuses when participants change
 watch(participants, (pts: Participant[]) => {
   localStatuses.value = new Map(
@@ -87,11 +96,13 @@ function setAll(status: string) {
 const saving = ref(false)
 
 async function handleSave() {
-  if (!isDirty.value) return
+  if (!peutEnregistrer.value) return
   saving.value = true
   try {
-    const { saved, errors } = await saveBatch(localStatuses.value)
-    if (errors === 0) {
+    const { saved, errors, refuse } = await saveBatch(localStatuses.value)
+    if (refuse) {
+      toast.add({ severity: 'error', summary: 'Enregistrement refusé', detail: refuse, life: 6000 })
+    } else if (errors === 0) {
       toast.add({ severity: 'success', summary: `${saved} présence(s) enregistrée(s)`, life: 3000 })
     } else {
       toast.add({ severity: 'warn', summary: `${saved} enregistrée(s), ${errors} erreur(s)`, life: 4000 })
@@ -224,17 +235,25 @@ const stats = computed(() => {
                 severity="success"
                 outlined
                 size="small"
-                :disabled="participants.length === 0 || saving"
+                :disabled="participants.length === 0 || saving || !feuilleEcrivable"
                 @click="setAll('present')"
               />
               <Button
                 label="Enregistrer"
                 icon="pi pi-save"
                 :loading="saving"
-                :disabled="!isDirty"
+                :disabled="!peutEnregistrer"
                 @click="handleSave"
               />
             </div>
+          </div>
+
+          <!--
+            ÉTAT « TRONQUÉE » — role="alert" et NON aria-live="polite" : ce n'est pas une
+            annonce de résultat, c'est un blocage. Le lecteur d'écran doit l'interrompre.
+          -->
+          <div v-if="erreurFeuille" role="alert" class="dash-error">
+            <i class="pi pi-exclamation-triangle" aria-hidden="true" /> {{ erreurFeuille }}
           </div>
 
           <!-- Stats résumé -->
@@ -256,10 +275,17 @@ const stats = computed(() => {
             </div>
           </div>
 
-          <!-- Chargement présences -->
-          <div v-if="loadingAttendances" class="list-skeleton">
+          <!--
+            ÉTAT « CHARGEMENT ». Ce drapeau couvre désormais LES DEUX collections : les
+            inscriptions ayant rejoint `selectSchedule`, son nom a cessé de mentir — d'où
+            `chargementFeuille` à la place de `loadingAttendances`.
+          -->
+          <div v-if="chargementFeuille" class="list-skeleton">
             <Skeleton v-for="i in 4" :key="i" height="2.75rem" border-radius="8px" />
           </div>
+
+          <!-- ÉTAT « TRONQUÉE » : la table n'est pas rendue du tout, l'alerte ci-dessus parle. -->
+          <template v-else-if="erreurFeuille" />
 
           <!-- DataTable présences -->
           <DataTable
@@ -268,10 +294,17 @@ const stats = computed(() => {
             aria-label="Feuille de présence"
             class="attendance-table"
           >
+            <!--
+              ÉTAT « VIDE LÉGITIME », et il est désormais VRAI. Cette phrase s'affichait sur
+              21 créneaux sur 24 parce que la page 1 des inscriptions n'atteignait pas leur
+              session — elle décrivait une troncature, pas une session sans inscrit. Filtrée
+              par `?session=`, elle ne s'affiche plus que pour les 9 créneaux dont la session
+              n'a réellement aucune inscription active.
+            -->
             <template #empty>
               <div class="empty-state">
                 <i class="pi pi-users" />
-                <p>Aucun inscrit actif trouvé pour cette session.</p>
+                <p>Aucun inscrit actif pour cette session.</p>
               </div>
             </template>
 
@@ -337,7 +370,7 @@ const stats = computed(() => {
               label="Enregistrer les présences"
               icon="pi pi-save"
               :loading="saving"
-              :disabled="!isDirty"
+              :disabled="!peutEnregistrer"
               @click="handleSave"
             />
           </div>

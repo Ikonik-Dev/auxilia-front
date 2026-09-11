@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { apiUsersGetCollection, apiUsersPost, apiUsersIdPatch, apiUsersIdDelete } from '@/api'
+import { ErreurCollection, lireCollectionLd } from '@/api/collection'
 import type { UserUserRead, UserUserWrite, UserUserWriteJsonMergePatch } from '@/api'
 
 /**
@@ -19,27 +20,6 @@ export interface RequeteUtilisateurs {
   /** Rôle EXACT tel qu'il est stocké en base — `ROLE_USER` ne désigne donc que les stagiaires. */
   roles?: string
   isActive?: boolean
-}
-
-/**
- * Forme réelle d'une collection `application/ld+json`.
- *
- * ⚠ ÉCRITE À LA MAIN PARCE QUE LE SDK NE LA CONNAÎT PAS. `types.gen.ts` déclare
- * `ApiUsersGetCollectionResponses = { 200: Array<UserUserRead> }` — inconditionnellement,
- * sans égard pour l'en-tête `Accept`. Le générateur ne retient qu'un seul type de contenu.
- */
-interface CollectionLd<T> {
-  member: T[]
-  totalItems: number
-}
-
-function estCollectionLd<T>(valeur: unknown): valeur is CollectionLd<T> {
-  return (
-    typeof valeur === 'object' &&
-    valeur !== null &&
-    Array.isArray((valeur as { member?: unknown }).member) &&
-    typeof (valeur as { totalItems?: unknown }).totalItems === 'number'
-  )
 }
 
 /**
@@ -114,16 +94,19 @@ export function useUtilisateurs() {
       // générateur n'a retenu qu'un seul type de contenu, alors que c'est l'en-tête `Accept`
       // ci-dessus qui décide de la forme. `vue-tsc` ne peut pas voir cette rupture — le type
       // ment, il n'échoue pas. Cette garde la transforme en erreur visible.
-      if (!estCollectionLd<UserUserRead>(data)) {
-        error.value = 'Réponse inattendue du serveur (format de collection).'
-        return
-      }
+      //
+      // ⚠ ON N'EXIGE PAS `membres.length === total` ICI, contrairement à `/assiduite` :
+      // une page 1 sur 3 est INCOMPLÈTE PAR CONSTRUCTION, c'est le principe même de la
+      // pagination. L'écart n'est une anomalie que pour une collection lue en entier.
+      const { membres, total: annonce } = lireCollectionLd<UserUserRead>(data)
 
-      utilisateurs.value = data.member
-      total.value = data.totalItems
-    } catch {
+      utilisateurs.value = membres
+      total.value = annonce
+    } catch (err) {
       if (moi !== jeton) return
-      error.value = 'Impossible de charger les utilisateurs.'
+      error.value = err instanceof ErreurCollection
+        ? err.message
+        : 'Impossible de charger les utilisateurs.'
     } finally {
       if (moi === jeton) loading.value = false
     }

@@ -2586,6 +2586,8 @@ export type ApiAttendancesGetCollectionData = {
          * The collection page number
          */
         page?: number;
+        schedule?: string;
+        'schedule[]'?: Array<string>;
     };
     url: '/api/attendances';
 };
@@ -3269,6 +3271,10 @@ export type ApiEnrollmentsGetCollectionData = {
          * The collection page number
          */
         page?: number;
+        session?: string;
+        'session[]'?: Array<string>;
+        status?: string;
+        'status[]'?: Array<string>;
     };
     url: '/api/enrollments';
 };
