@@ -3271,6 +3271,10 @@ export type ApiEnrollmentsGetCollectionData = {
          * The collection page number
          */
         page?: number;
+        /**
+         * The number of items per page
+         */
+        itemsPerPage?: number;
         session?: string;
         'session[]'?: Array<string>;
         status?: string;

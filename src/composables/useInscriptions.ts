@@ -5,22 +5,55 @@ import {
   apiEnrollmentsIdPut,
   apiEnrollmentsIdDelete,
 } from '@/api'
+import { ErreurCollection, PLAFOND_ITEMS_PAR_PAGE, lireCollectionSousPlafond } from '@/api/collection'
 import type { EnrollmentEnrollmentReadUserSummary, EnrollmentEnrollmentWrite } from '@/api'
 
+/**
+ * Inscriptions.
+ *
+ * ⚠ CET ÉCRAN AFFICHAIT 30 INSCRIPTIONS SUR 47, SANS LE DIRE (chantier A4, 16 septembre 2026).
+ * `fetchInscriptions` lisait la page 1 de `/api/enrollments` ; la `DataTable` paginait ensuite
+ * côté client ces 30 lignes comme si elles étaient tout. La recherche, le filtre de statut et le
+ * compteur « en attente » portaient sur la même page.
+ *
+ * Aucune écriture n'en dépendait — valider et supprimer prennent l'identifiant de la ligne
+ * cliquée —, d'où un correctif de LECTURE : la collection est lue entière, ou pas du tout.
+ */
 export function useInscriptions() {
   const inscriptions = ref<EnrollmentEnrollmentReadUserSummary[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  async function fetchInscriptions(page = 1) {
+  /**
+   * ⚠ LE PARAMÈTRE `page` A ÉTÉ RETIRÉ, DÉLIBÉRÉMENT — comme dans `useEvaluations`. Le garder
+   * inviterait à repaginer une collection qu'on a décidé de lire entière.
+   *
+   * ⚠ `itemsPerPage` N'A D'EFFET QUE PARCE QU'`Enrollment` DÉCLARE
+   * `paginationClientItemsPerPage: true`. Sans cet attribut, le serveur l'ignore en silence et
+   * rend 30 lignes : `lireCollectionSousPlafond` lève alors, et l'écran affiche une alerte au lieu
+   * d'une liste fausse.
+   */
+  async function fetchInscriptions() {
     loading.value = true
     error.value = null
     try {
-      const { data, error: apiError } = await apiEnrollmentsGetCollection({ query: { page } })
-      if (apiError) error.value = 'Impossible de charger les inscriptions.'
-      else inscriptions.value = (data ?? []) as EnrollmentEnrollmentReadUserSummary[]
-    } catch {
-      error.value = 'Impossible de charger les inscriptions.'
+      const { data, error: apiError } = await apiEnrollmentsGetCollection({
+        query: { itemsPerPage: PLAFOND_ITEMS_PAR_PAGE },
+        headers: { Accept: 'application/ld+json' },
+      })
+      if (apiError) throw new ErreurCollection("Le serveur n'a pas rendu la liste des inscriptions.")
+
+      inscriptions.value = lireCollectionSousPlafond<EnrollmentEnrollmentReadUserSummary>(
+        data, 'Inscriptions',
+      )
+    } catch (e) {
+      // ⚠ FAIL CLOSED. Une liste partielle affichée comme entière est le défaut corrigé : on vide.
+      // Le compteur « en attente » tombe à 0 et son badge disparaît — il ne s'affiche pas à côté
+      // d'une alerte qui dit qu'on ne sait pas.
+      inscriptions.value = []
+      error.value = e instanceof ErreurCollection
+        ? e.message
+        : 'Impossible de charger les inscriptions.'
     } finally {
       loading.value = false
     }

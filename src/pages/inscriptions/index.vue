@@ -46,6 +46,17 @@ const STATUS_OPTIONS = [
   { label: 'Abandonné',        value: 'abandoned' },
 ]
 
+// ⚠ TOUT LE CIRCUIT « EN ATTENTE » EST AUJOURD'HUI INATTEIGNABLE PAR CET ÉCRAN, et ce n'est pas
+// une dette : c'est une règle. EnrollmentStateProcessor.php:76-77 réécrit 'pending' en 'active'
+// avant la persistance, donc le formulaire de cette page ne peut pas produire une ligne en
+// attente. `enrollment.status = 'pending'` vaut 0 en base (16 septembre 2026) : ce compteur
+// affiche 0 pour 0 réel, et le bouton « Valider » du template ne s'affiche sur aucune ligne.
+//
+// Il redevient actif dès qu'une ligne 'pending' entre par une autre voie (fixtures, SQL, autre
+// client, ou le jour où ces deux lignes du Processor sautent). Avant le chantier A4 il aurait
+// alors été faux IMMÉDIATEMENT, pas au bout d'un certain volume : l'ordre est l'id croissant, la
+// page 1 s'arrêtait à l'id 2741 et l'AUTO_INCREMENT était à 2759 — toute ligne neuve naissait
+// hors de la page lue. C'est la lecture complète de `useInscriptions` qui l'en empêche.
 const pendingCount = computed(() => inscriptions.value.filter((e) => e.status === 'pending').length)
 
 const filtered = computed(() => {
@@ -161,7 +172,20 @@ async function handleDelete() {
         Inscriptions
         <span v-if="pendingCount > 0" class="pending-badge">{{ pendingCount }} en attente</span>
       </h1>
-      <Button v-if="canWrite" label="Nouvelle inscription" icon="pi pi-user-plus" @click="showForm = true; saveError = null" />
+      <!-- ⚠ DÉSACTIVÉ TANT QUE LA LISTE N'EST PAS LUE EN ENTIER, et le motif est un HTTP 500.
+           Enrollment.php porte UniqueConstraint('unique_user_session'), et RIEN ne la garde :
+           EnrollmentStateProcessor ne lève que sur le débit et sur la CAPACITÉ de la session,
+           aucun exception_to_status n'est déclaré. Un doublon remonte donc en 500 non traité —
+           mesuré par EnrollmentCollectionTest. Créer sans pouvoir consulter les inscriptions
+           existantes, c'est décider à l'aveugle si la personne y est déjà : la forme exacte du
+           défaut d'/assiduite. Dette 🔴 consignée dans ROADMAP.md. -->
+      <Button
+        v-if="canWrite"
+        label="Nouvelle inscription"
+        icon="pi pi-user-plus"
+        :disabled="loading || error !== null"
+        @click="showForm = true; saveError = null"
+      />
     </div>
 
     <!-- Erreur chargement -->
@@ -203,6 +227,9 @@ async function handleDelete() {
         sort-field="status"
         :sort-order="1"
       >
+        <!-- INVARIANT : cette table n'est rendue qu'après une lecture COMPLÈTE (le v-if="error"
+             ci-dessus l'écarte sinon). Un tableau vide ici prouve donc qu'il n'y a rien — ou
+             que la recherche locale n'a rien trouvé parmi TOUTES les inscriptions. -->
         <template #empty>
           <div class="empty-state">
             <i class="pi pi-user-plus" />

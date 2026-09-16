@@ -83,3 +83,41 @@ export function lireCollectionComplete<T>(data: unknown, quoi: string): T[] {
 
   return membres
 }
+
+/**
+ * Plafond de `?itemsPerPage` côté serveur — MIROIR de `pagination_maximum_items_per_page`
+ * (`auxilia-api/config/packages/api_platform.yaml:18`).
+ *
+ * ⚠ 100 N'EST PAS UN CHIFFRE ROND. Au-delà, le serveur ramène à 100 EN SILENCE : demander 200
+ * afficherait une intention jamais obtenue. En deçà, on poserait un second plafond, non déclaré.
+ *
+ * ⚠ Ne vaut QUE pour une ressource qui déclare `paginationClientItemsPerPage: true` — `User` et
+ * `Enrollment` au 16 septembre 2026. Ailleurs le paramètre est IGNORÉ et la page reste de 30 :
+ * c'est mesuré (`/api/lesson_completions?itemsPerPage=100` rend 30 membres sur 967).
+ */
+export const PLAFOND_ITEMS_PAR_PAGE = 100
+
+/**
+ * `lireCollectionComplete`, précédée d'un contrôle qui NOMME LE SEUIL à l'utilisateur.
+ *
+ * Au-delà de `PLAFOND_ITEMS_PAR_PAGE`, une lecture complète en une requête est impossible, et
+ * `lireCollectionComplete` le dirait en chiffres bruts (« 100 éléments reçus sur 130 »). Ce
+ * message-là ne dit pas à l'utilisateur POURQUOI, ni que c'est une limite de l'écran et non une
+ * panne passagère. Celui-ci le dit.
+ *
+ * ⚠ ELLE NE REMPLACE PAS `lireCollectionComplete` : elle l'appelle. Sous le plafond, un écart
+ * entre reçu et annoncé (paramètre ignoré, attribut retiré de l'entité) reste attrapé par elle.
+ */
+export function lireCollectionSousPlafond<T>(data: unknown, quoi: string): T[] {
+  const { total } = lireCollectionLd<T>(data)
+
+  if (total > PLAFOND_ITEMS_PAR_PAGE) {
+    throw new ErreurCollection(
+      `${quoi} : ${total} annoncés, au-delà des ${PLAFOND_ITEMS_PAR_PAGE} que le serveur accepte `
+        + 'de rendre en une fois. Cet écran ne peut pas les afficher tous : la liste est masquée '
+        + 'plutôt que montrée incomplète.',
+    )
+  }
+
+  return lireCollectionComplete<T>(data, quoi)
+}

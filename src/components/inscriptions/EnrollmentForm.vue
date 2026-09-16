@@ -1,6 +1,12 @@
 ﻿<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { apiUsersGetCollection, apiSessionsGetCollection } from '@/api'
+import {
+  ErreurCollection,
+  PLAFOND_ITEMS_PAR_PAGE,
+  lireCollectionComplete,
+  lireCollectionSousPlafond,
+} from '@/api/collection'
 import type { UserUserRead, SessionSessionRead, EnrollmentEnrollmentWrite } from '@/api'
 import AutoComplete from 'primevue/autocomplete'
 import Select from 'primevue/select'
@@ -22,13 +28,52 @@ const emit = defineEmits<{
 const allUsers    = ref<UserUserRead[]>([])
 const allSessions = ref<SessionSessionRead[]>([])
 
+/**
+ * ⚠ CE FORMULAIRE NE PROPOSAIT QUE LA PREMIÈRE PAGE DES UTILISATEURS (chantier A4, 16 septembre
+ * 2026). `apiUsersGetCollection()` sans paramètre rendait 30 fiches : 18, 20 ou 23 stagiaires
+ * sélectionnables sur 41 selon le compte (superviseur, directeur, respeda). Avec `force-selection`,
+ * un stagiaire absent de la liste ne pouvait pas être saisi — et rien ne distinguait « pas encore
+ * chargé » ou « hors de la page » de « n'existe pas ».
+ *
+ * D'où la règle de ce composant : TANT QUE LES LISTES NE SONT PAS LUES EN ENTIER, LES CHAMPS
+ * SONT DÉSACTIVÉS. Une boîte grisée dit « je ne sais pas » ; une boîte active qui ne propose rien
+ * dit « il n'existe pas ». Seule la première est vraie.
+ */
+const chargementListes = ref(true)
+const erreurListes     = ref<string | null>(null)
+const listesPretes     = computed(() => !chargementListes.value && erreurListes.value === null)
+
 onMounted(async () => {
-  const [usersRes, sessionsRes] = await Promise.all([
-    apiUsersGetCollection(),
-    apiSessionsGetCollection(),
-  ])
-  allUsers.value    = (usersRes.data ?? []).filter((u) => u.isActive)
-  allSessions.value = (sessionsRes.data ?? []).filter((s) => s.status !== 'cancelled')
+  try {
+    const [usersRes, sessionsRes] = await Promise.all([
+      apiUsersGetCollection({
+        query: { itemsPerPage: PLAFOND_ITEMS_PAR_PAGE },
+        headers: { Accept: 'application/ld+json' },
+      }),
+      // ⚠ PAS D'itemsPerPage ICI, et ce n'est pas un oubli : `Session` ne déclare pas
+      // `paginationClientItemsPerPage`, le paramètre serait ignoré. 12 sessions sur 12 sont lues
+      // aujourd'hui — cette garde ne change RIEN à l'affichage actuel. Son plafond implicite est
+      // 30, pas 100 : à la 31e session elle lèvera plutôt que de tronquer (dette 🟡 LATENTE).
+      apiSessionsGetCollection({ headers: { Accept: 'application/ld+json' } }),
+    ])
+    if (usersRes.error || sessionsRes.error) {
+      throw new ErreurCollection("Le serveur n'a pas rendu la liste des stagiaires ou des sessions.")
+    }
+
+    allUsers.value = lireCollectionSousPlafond<UserUserRead>(usersRes.data, 'Utilisateurs')
+      .filter((u) => u.isActive)
+    allSessions.value = lireCollectionComplete<SessionSessionRead>(sessionsRes.data, 'Sessions')
+      .filter((s) => s.status !== 'cancelled')
+  } catch (e) {
+    // ⚠ FAIL CLOSED : aucune suggestion partielle.
+    allUsers.value = []
+    allSessions.value = []
+    erreurListes.value = e instanceof ErreurCollection
+      ? e.message
+      : 'Impossible de charger les stagiaires et les sessions.'
+  } finally {
+    chargementListes.value = false
+  }
 })
 
 // ── Enriched user type for AutoComplete display ──
@@ -78,6 +123,7 @@ function validate(): boolean {
 }
 
 function handleSubmit() {
+  if (!listesPretes.value) return
   if (!validate()) return
   const payload: EnrollmentEnrollmentWrite = {
     user:               `/api/users/${selectedUser.value!.id}`,
@@ -104,6 +150,11 @@ function handleSubmit() {
       <span v-else>{{ saveError }}</span>
     </div>
 
+    <div v-if="erreurListes" class="form-banner-error" role="alert">
+      <i class="pi pi-exclamation-triangle" aria-hidden="true" />
+      <span>{{ erreurListes }} Impossible de créer une inscription tant que ces listes sont incomplètes.</span>
+    </div>
+
     <div class="form-fields">
       <!-- Stagiaire -->
       <div class="field">
@@ -114,7 +165,8 @@ function handleSubmit() {
           :suggestions="userSuggestions"
           option-label="displayLabel"
           :invalid="!!errors.user"
-          placeholder="Rechercher par nom ou email…"
+          :disabled="!listesPretes"
+          :placeholder="chargementListes ? 'Chargement des stagiaires…' : 'Rechercher par nom ou email…'"
           force-selection
           fluid
           @complete="searchUser"
@@ -143,6 +195,7 @@ function handleSubmit() {
           option-value="value"
           placeholder="Sélectionner une session"
           :invalid="!!errors.session"
+          :disabled="!listesPretes"
           fluid
         >
           <template #option="{ option }">
@@ -170,7 +223,7 @@ function handleSubmit() {
 
     <div class="form-actions">
       <Button type="button" label="Annuler" severity="secondary" text :disabled="saving" @click="emit('cancel')" />
-      <Button type="submit" label="Créer l'inscription" icon="pi pi-check" :loading="saving" />
+      <Button type="submit" label="Créer l'inscription" icon="pi pi-check" :loading="saving" :disabled="!listesPretes" />
     </div>
   </form>
 </template>
