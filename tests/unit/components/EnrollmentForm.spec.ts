@@ -133,3 +133,34 @@ describe('EnrollmentForm — aucune suggestion tant que les listes ne sont pas l
     expect(w.findComponent({ name: 'AutoComplete' }).props('disabled')).toBe(false)
   })
 })
+
+// ══ Chantier A6 — le bandeau d'échec n'invente plus de motif (16 septembre 2026) ════════════
+
+describe("EnrollmentForm — le bandeau affiche le message reçu, et rien d'autre", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    apiUsersGetCollection.mockResolvedValue(ld(stagiaires(41)))
+    apiSessionsGetCollection.mockResolvedValue(ld(sessions(12)))
+  })
+
+  function monterAvec(saveError: string) {
+    return mount(EnrollmentForm, {
+      props: { saveError },
+      global: { stubs: { AutoComplete: true, Select: true, Button: true, Textarea: true, Tag: true } },
+    })
+  }
+
+  it("affiche le motif traduit tel quel", async () => {
+    const w = monterAvec("Ce stagiaire est déjà inscrit à cette session.")
+    await flushPromises()
+
+    expect(w.find("[role=\"alert\"]").text()).toBe("Ce stagiaire est déjà inscrit à cette session.")
+  })
+
+  it("ne traduit PLUS la chaîne « 422 » en « Capacité maximale atteinte »", async () => {
+    const w = monterAvec("422")
+    await flushPromises()
+
+    expect(w.text()).not.toContain("Capacité maximale")
+  })
+})

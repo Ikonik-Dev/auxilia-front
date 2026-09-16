@@ -1,7 +1,7 @@
 ﻿<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { useInscriptions } from '@/composables/useInscriptions'
+import { EchecInscription, useInscriptions } from '@/composables/useInscriptions'
 import EnrollmentForm from '@/components/inscriptions/EnrollmentForm.vue'
 import type { EnrollmentEnrollmentReadUserSummary, EnrollmentEnrollmentWrite } from '@/api'
 import DataTable from 'primevue/datatable'
@@ -109,10 +109,17 @@ async function handleValidate(enrollment: EnrollmentEnrollmentReadUserSummary) {
     if (idx !== -1) inscriptions.value[idx] = updated
     toast.add({ severity: 'success', summary: 'Inscription validée', detail: `${getUserName(enrollment.user)} — ${enrollment.session.name}`, life: 3000 })
   } catch (e) {
-    const msg = (e as Error).message === '422'
-      ? 'Capacité de la session atteinte.'
-      : 'Impossible de valider l\'inscription.'
-    toast.add({ severity: 'error', summary: 'Erreur', detail: msg, life: 4000 })
+    // ⚠ Chantier A6 : ce toast affichait « Capacité de la session atteinte. » sur un 422 — sur
+    // le PUT, qui n'a AUCUN contrôle de capacité côté serveur (pas de processor). Le message
+    // vient désormais de la même traduction que la création.
+    const echec = e instanceof EchecInscription ? e : null
+    toast.add({
+      severity: 'error',
+      summary: 'Erreur',
+      detail: echec?.message ?? 'Impossible de valider l\'inscription.',
+      life: 4000,
+    })
+    if (echec?.relireLaListe) await fetchInscriptions()
   } finally {
     validating.value = null
   }
@@ -132,7 +139,13 @@ async function handleCreate(payload: EnrollmentEnrollmentWrite) {
     toast.add({ severity: 'success', summary: 'Inscription créée', life: 3000 })
     await fetchInscriptions()
   } catch (e) {
-    saveError.value = (e as Error).message === '422' ? '422' : 'Une erreur est survenue.'
+    // ⚠ Chantier A6 : ici, seul un 422 recevait un message, et c'était « Capacité maximale
+    // atteinte » — sur une erreur de VALIDATION. Le 409 de capacité et le 500 du doublon
+    // affichaient « Une erreur est survenue. ». Le dialogue reste ouvert, avec le motif juste.
+    const echec = e instanceof EchecInscription ? e : null
+    saveError.value = echec?.message ?? 'Impossible d\'enregistrer l\'inscription.'
+    // Doublon, 400, 500 : la liste affichée est peut-être fausse — on la relit.
+    if (echec?.relireLaListe) await fetchInscriptions()
   } finally {
     saving.value = false
   }

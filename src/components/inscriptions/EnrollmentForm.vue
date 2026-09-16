@@ -142,12 +142,13 @@ function handleSubmit() {
 
 <template>
   <form class="enrollment-form" novalidate @submit.prevent="handleSubmit">
+    <!-- ⚠ Chantier A6 : ce bandeau traduisait lui-même la chaîne '422' en « Capacité maximale
+         atteinte » — sur une erreur de validation, jamais sur la capacité (un 409). Il affiche
+         désormais le message déjà traduit par echecInscription() (useInscriptions.ts), et rien
+         d'autre : aucun texte d'erreur ne vit plus ici. -->
     <div v-if="saveError" class="form-banner-error" role="alert">
-      <i class="pi pi-exclamation-circle" />
-      <span v-if="saveError === '422'">
-        Capacité maximale atteinte pour cette session.
-      </span>
-      <span v-else>{{ saveError }}</span>
+      <i class="pi pi-exclamation-circle" aria-hidden="true" />
+      <span>{{ saveError }}</span>
     </div>
 
     <div v-if="erreurListes" class="form-banner-error" role="alert">
