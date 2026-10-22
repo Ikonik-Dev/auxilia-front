@@ -159,8 +159,8 @@ l'absence de ce réflexe qui a laissé le build cassé pendant un mois en 2026.
 ```
 src/
 ├── api/
-│   ├── client.ts          # Configuration du client HTTP (@hey-api/client-fetch)
-│   ├── index.ts           # Re-export centralisé
+│   ├── authInterceptor.ts # 401 → un refresh (verrou partagé) → un rejeu ; branché dans main.ts
+│   ├── index.ts           # Configuration du client SDK + re-export centralisé
 │   └── generated/         # ⚠ GÉNÉRÉ AUTOMATIQUEMENT — ne jamais modifier manuellement
 │                          #   VERSIONNÉ dans Git (cf. .gitignore) : c'est ce qui rend
 │                          #   la CI possible sans backend. Après generate:api,
@@ -244,7 +244,7 @@ Après toute modification d'entité backend, régénérer le SDK : `npm run gene
 > | `useDocuments.ts:37` (`uploadDocument`) | `POST /api/documents` | ✅ **inévitable** — multipart, le SDK ne gère pas `FormData` |
 > | `stores/auth.ts:49` (`fetchMe`) | `GET /api/auth/me` | ✅ **inévitable** — route d'`AuthController`, absente du schéma OpenAPI donc du SDK |
 > | `stores/auth.ts:101` (`refresh`) | `POST /api/auth/refresh` | ✅ **inévitable** — idem |
-> | `stores/auth.ts:122` (`logout`) | `POST /api/auth/logout` | ✅ **inévitable** — idem |
+> | `stores/auth.ts` (`logout`) | `POST /api/auth/refresh/logout` | ✅ **inévitable** — idem. Depuis le lot 1.1b : cette route **révoque** le jeton de rafraîchissement en base ; l'ancienne `/api/auth/logout` ne faisait que vider les cookies |
 > | `stores/auth.ts:86` (debug) | `GET /api/auth/debug` | ✅ **inévitable** — idem, et gardé par `import.meta.env.DEV` |
 > | `stores/auth.ts:72` (`login`) | `POST /api/auth/login` | ⚠️ **évitable** — l'opération **existe** dans le SDK sous le nom `loginCheckPost` (`src/api/generated/sdk.gen.ts:664`), générée par le décorateur OpenAPI de lexik-jwt |
 >
@@ -277,9 +277,10 @@ Les pages ne font pas d'appel API directement — elles utilisent le composable.
 - **Pas de token en localStorage** — décision de sécurité validée, ne pas revenir en arrière.
 - L'auth repose sur les cookies HttpOnly envoyés automatiquement (`credentials: 'include'`).
 - `isAuthenticated` est basé sur `user !== null` (résultat de `fetchMe()`), jamais sur un token localStorage.
-- Pas d'intercepteur `Authorization: Bearer` dans `client.ts` — le cookie est envoyé automatiquement.
-- **Logout** : `auth.logout()` est async et appelle `POST /api/auth/logout` avant d'effacer `user.value`. Ne jamais faire un logout en effaçant uniquement le state Pinia — les cookies HttpOnly ne sont supprimables que par le backend.
-- **Exception SDK-first** : `src/stores/auth.ts` utilise `fetch()` manuellement pour les 4 endpoints auth (`/api/auth/login`, `/api/auth/me`, `/api/auth/refresh`, `/api/auth/logout`) — ces routes ne sont pas exposées via API Platform et n'ont pas de SDK généré. C'est la seule exception autorisée.
+- Pas d'intercepteur `Authorization: Bearer` — le cookie est envoyé automatiquement.
+- **Intercepteur 401 (lot 1.1b)** : `src/api/authInterceptor.ts`, branché sur le client SDK dans `main.ts`. Un 401 déclenche UN refresh puis UN rejeu ; N requêtes en 401 simultanées partagent un seul refresh (verrou `refreshCoordinator`, le même que celui du garde de routeur via `auth.refresh()`). Les routes `/api/auth/*` ne sont jamais rejouées. Issues du refresh (`RefreshOutcome`) : `refreshed` ; `lost` (401 confirmé par une sonde `/api/auth/me` : un autre onglet a pu renouveler la session entre-temps) → `user = null` + redirection `/login` ; `transient` (429, 5xx, réseau, timeout 10 s) → la requête garde son 401, **on ne déconnecte pas**. Le rejeu appelle `fetch` sans objet receveur (sinon « Illegal invocation » dans le navigateur). `apiClient` (ancien `client.ts`, intercepteur vide, 0 importeur) a été retiré. Asservi par `tests/unit/api/authInterceptor.spec.ts`, `tests/unit/stores/auth.spec.ts` et `tests/e2e/session-renouvellement.spec.ts`.
+- **Logout** : `auth.logout()` est async et appelle `POST /api/auth/refresh/logout` (qui révoque le jeton de rafraîchissement, lot 1.1b) avant d'effacer `user.value`. Ne jamais faire un logout en effaçant uniquement le state Pinia — les cookies HttpOnly ne sont supprimables que par le backend.
+- **Exception SDK-first** : `src/stores/auth.ts` utilise `fetch()` manuellement pour les 4 endpoints auth (`/api/auth/login`, `/api/auth/me`, `/api/auth/refresh`, `/api/auth/refresh/logout`) — ces routes ne sont pas exposées via API Platform et n'ont pas de SDK généré. C'est la seule exception autorisée.
 
 ### Proxy Vite
 En dev, tous les appels `/api/*` sont proxifiés vers `http://localhost:8080` avec `cookieDomainRewrite: 'localhost'`.

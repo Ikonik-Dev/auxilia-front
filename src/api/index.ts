@@ -8,9 +8,6 @@ client.setConfig({
   credentials: 'include',
 })
 
-// Client fetch bas niveau (auth store, endpoints hors SDK)
-export { apiClient } from './client'
-
 // Re-exporte toutes les fonctions et types générés depuis un seul point d'entrée.
 // Les composables importent depuis '@/api', pas depuis '@/api/generated' directement,
 // ce qui garantit que setConfig() a été exécuté avant le premier appel SDK.

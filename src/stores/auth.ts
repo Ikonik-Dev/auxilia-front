@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { refreshCoordinator, type RefreshOutcome } from '@/api/authInterceptor'
 
 /**
  * ⚠ DEUX NOTIONS DE RÔLE, ET ELLES NE SE CONTIENNENT PAS (Phase 17 étape 5, 10 sept. 2026).
@@ -86,30 +87,47 @@ export const useAuthStore = defineStore('auth', () => {
     return grantedRoles.value.includes(role)
   }
 
-  async function fetchMe(): Promise<void> {
+  /** Délai de chaque appel d'authentification : le conteneur Docker met jusqu'à 4-5 s à froid. */
+  const AUTH_TIMEOUT_MS = 10_000
+
+  /**
+   * Interroge `GET /api/auth/me` et, si la réponse est 200, installe le profil.
+   * - `ok`           : profil reçu et installé ;
+   * - `unauthorized` : 401, la session n'existe pas ou plus ;
+   * - `transient`    : toute autre issue (429, 5xx, réseau, timeout) : on ne sait RIEN de la
+   *                    session, l'appelant ne doit pas la déclarer perdue.
+   * N'efface jamais `user` : c'est à l'appelant de décider.
+   */
+  async function requestMe(): Promise<'ok' | 'unauthorized' | 'transient'> {
     const ctrl = new AbortController()
-    // Timeout augmenté à 10 s pour absorber le warm-up Docker
-    const timer = setTimeout(() => ctrl.abort(), 10_000)
-    log('fetchMe → GET /api/auth/me …')
+    const timer = setTimeout(() => ctrl.abort(), AUTH_TIMEOUT_MS)
+    log('me → GET /api/auth/me …')
     try {
       const response = await fetch('/api/auth/me', {
         credentials: 'include',
         signal: ctrl.signal,
       })
-      log('fetchMe ← status', { status: response.status, ok: response.ok })
+      log('me ← status', { status: response.status, ok: response.ok })
       if (response.ok) {
         user.value = (await response.json()) as UserProfile
-        log('fetchMe → user set', { email: user.value.email, roles: user.value.roles })
-      } else {
-        user.value = null
-        log('fetchMe → user null (réponse non-ok)')
+        log('me → user set', { email: user.value.email, roles: user.value.roles })
+        return 'ok'
       }
+      return response.status === 401 ? 'unauthorized' : 'transient'
     } catch (err) {
-      user.value = null
       const isTimeout = err instanceof DOMException && err.name === 'AbortError'
-      log('fetchMe → ERREUR', isTimeout ? 'TIMEOUT (AbortController)' : String(err))
+      log('me → ERREUR', isTimeout ? 'TIMEOUT (AbortController)' : String(err))
+      return 'transient'
     } finally {
       clearTimeout(timer)
+    }
+  }
+
+  async function fetchMe(): Promise<void> {
+    // Démarrage et garde de routeur : toute issue autre que « profil reçu » = pas de session.
+    if ((await requestMe()) !== 'ok') {
+      user.value = null
+      log('fetchMe → user null')
     }
   }
 
@@ -138,10 +156,20 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function refresh(): Promise<boolean> {
+  /**
+   * Un appel `POST /api/auth/refresh`, rendu en issue typée (cf. `RefreshOutcome`).
+   *
+   * - 2xx : la session est renouvelée ; le profil est relu. Un 401 sur cette relecture, juste
+   *   après un refresh réussi, veut dire « compte désactivé entre-temps » : session perdue.
+   * - 401 : le jeton de rafraîchissement n'est pas accepté. Avant de conclure, SONDE `/me` : les
+   *   cookies sont communs à tous les onglets, un autre onglet a pu renouveler la session une
+   *   fraction de seconde plus tôt (le jeton est à usage unique). `/me` répond 200 → renouvelée.
+   * - tout le reste (429, 5xx, réseau, timeout) : transitoire, on ne déconnecte pas.
+   */
+  async function requestRefresh(): Promise<RefreshOutcome> {
     const ctrl = new AbortController()
-    // Timeout augmenté à 10 s pour absorber le warm-up Docker
-    const timer = setTimeout(() => ctrl.abort(), 10_000)
+    const timer = setTimeout(() => ctrl.abort(), AUTH_TIMEOUT_MS)
+    let status: number
     log('refresh → POST /api/auth/refresh …')
     try {
       const response = await fetch('/api/auth/refresh', {
@@ -149,23 +177,57 @@ export const useAuthStore = defineStore('auth', () => {
         credentials: 'include',
         signal: ctrl.signal,
       })
-      log('refresh ← status', { status: response.status, ok: response.ok })
-      if (!response.ok) return false
-      await fetchMe()
-      return true
+      status = response.status
+      log('refresh ← status', { status, ok: response.ok })
     } catch (err) {
       const isTimeout = err instanceof DOMException && err.name === 'AbortError'
       log('refresh → ERREUR', isTimeout ? 'TIMEOUT (AbortController)' : String(err))
-      return false
+      return 'transient'
     } finally {
       clearTimeout(timer)
     }
+
+    if (status >= 200 && status < 300) {
+      // Seul un 401 de la relecture contredit le refresh. Un échec transitoire (429, réseau,
+      // timeout) laisse les cookies renouvelés : la session est valide, le rejeu peut partir.
+      // Le profil, lui, n'est peut-être pas relu : `refresh()` le vérifie (`user.value !== null`).
+      return (await requestMe()) === 'unauthorized' ? 'lost' : 'refreshed'
+    }
+    if (status === 401) {
+      const probe = await requestMe()
+      if (probe === 'ok') return 'refreshed'
+      return probe === 'unauthorized' ? 'lost' : 'transient'
+    }
+    return 'transient'
   }
 
+  /** Renouvelle la session (garde de routeur) ; vrai seulement si un profil est en place ensuite. */
+  async function refresh(): Promise<boolean> {
+    const outcome = await refreshCoordinator.run(requestRefresh)
+    return outcome === 'refreshed' && user.value !== null
+  }
+
+  /**
+   * La session est définitivement perdue (appelé par l'intercepteur). Idempotent : plusieurs
+   * requêtes en 401 simultanées concluent « perdue » ensemble. Rend vrai au PREMIER appel
+   * seulement, c'est-à-dire quand il faut rediriger vers /login.
+   */
+  function markSessionLost(): boolean {
+    if (user.value === null) return false
+    user.value = null
+    log('session perdue → user effacé')
+    return true
+  }
+
+  /**
+   * ⚠ `/api/auth/refresh/logout`, PAS `/api/auth/logout` : seule la première révoque le jeton
+   * de rafraîchissement en base. L'ancienne route ne supprimait que les cookies, et le jeton
+   * restait rejouable jusqu'à son expiration.
+   */
   async function logout(): Promise<void> {
-    log('logout → POST /api/auth/logout …')
+    log('logout → POST /api/auth/refresh/logout …')
     try {
-      const response = await fetch('/api/auth/logout', {
+      const response = await fetch('/api/auth/refresh/logout', {
         method: 'POST',
         credentials: 'include',
       })
@@ -178,6 +240,6 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     user, isAuthenticated, roles, grantedRoles, assignableRoles, managesAllRoles,
-    userEmail, userName, hasRole, login, refresh, logout, fetchMe,
+    userEmail, userName, hasRole, login, refresh, requestRefresh, markSessionLost, logout, fetchMe,
   }
 })

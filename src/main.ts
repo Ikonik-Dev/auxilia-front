@@ -29,6 +29,8 @@ const AuxiliaPreset = definePreset(Aura, {
 import ToastService from 'primevue/toastservice'
 import 'primeicons/primeicons.css'
 import { useAuthStore } from './stores/auth'
+import { client } from './api/generated/client.gen'
+import { installAuthInterceptor } from './api/authInterceptor'
 
 import App from './App.vue'
 
@@ -47,8 +49,17 @@ app.use(PrimeVue, {
 })
 app.use(ToastService)
 
-// Vérifier la session existante via cookie avant de monter l'app
 const auth = useAuthStore()
+
+// 401 sur un appel SDK : un refresh, un rejeu. Session perdue : retour à /login, une seule fois.
+installAuthInterceptor(client, {
+  doRefresh: auth.requestRefresh,
+  onSessionLost: () => {
+    if (auth.markSessionLost()) void router.replace({ name: 'login' })
+  },
+})
+
+// Vérifier la session existante via cookie avant de monter l'app
 await auth.fetchMe()
 
 app.mount('#app')
