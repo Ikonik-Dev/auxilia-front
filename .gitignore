@@ -50,3 +50,6 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+# Reglages locaux de Claude Code (propres au poste, jamais publies)
+/.claude/
