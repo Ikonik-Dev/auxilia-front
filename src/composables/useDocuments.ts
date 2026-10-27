@@ -2,7 +2,13 @@ import { ref } from 'vue'
 import { apiDocumentsGetCollection, apiDocumentDownloadsPost } from '@/api'
 import type { DocumentDocumentRead } from '@/api'
 
-const API_BASE = 'http://localhost:8080'
+/**
+ * URL relative (same-origin) du fichier d'un document : le cookie HttpOnly
+ * `BEARER` (path /api) l'accompagne, et le serveur applique le contrôle d'accès.
+ */
+export function documentFileUrl(id: number | string): string {
+  return `/api/documents/${encodeURIComponent(String(id))}/file`
+}
 
 export function useDocuments() {
   const documents = ref<DocumentDocumentRead[]>([])
@@ -29,12 +35,12 @@ export function useDocuments() {
     await apiDocumentDownloadsPost({
       body: { document: `/api/documents/${doc.id}` },
     }).catch(() => {/* silencieux — on ouvre quand même */})
-    // Ouvre le fichier (servi par contrôleur dédié backend)
-    window.open(`${API_BASE}/${doc.filePath}`, '_blank', 'noopener')
+    // Ouvre le fichier via la route contrôlée par le serveur (document_file)
+    window.open(documentFileUrl(doc.id), '_blank', 'noopener')
   }
 
   async function uploadDocument(formData: FormData): Promise<DocumentDocumentRead> {
-    const response = await fetch(`${API_BASE}/api/documents`, {
+    const response = await fetch('/api/documents', {
       method:      'POST',
       credentials: 'include',
       body:        formData,

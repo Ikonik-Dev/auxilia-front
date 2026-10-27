@@ -228,14 +228,9 @@ export type DocumentDocumentRead = {
 export type DocumentDocumentWrite = {
     title: string;
     description?: string | null;
-    filePath: string;
-    fileName: string;
-    fileSize?: number | string | null;
-    mimeType: string;
     category?: string | null;
     visibility: string;
     formation?: string | null;
-    uploadedBy?: string | null;
 };
 
 export type DocumentJsonldDocumentRead = HydraItemBaseSchema & {
@@ -834,7 +829,6 @@ export type MediaMediaRead = {
 export type MediaMediaWrite = {
     title: string;
     description?: string | null;
-    filePath: string;
     fileName: string;
     fileType: string;
     fileSize?: number | string | null;
@@ -3163,6 +3157,40 @@ export type ApiDocumentsIdPutResponses = {
 
 export type ApiDocumentsIdPutResponse = ApiDocumentsIdPutResponses[keyof ApiDocumentsIdPutResponses];
 
+export type DocumentFileData = {
+    body?: never;
+    path: {
+        /**
+         * Document identifier
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/api/documents/{id}/file';
+};
+
+export type DocumentFileErrors = {
+    /**
+     * Forbidden
+     */
+    403: ErrorJsonld;
+    /**
+     * Not found
+     */
+    404: ErrorJsonld;
+};
+
+export type DocumentFileError = DocumentFileErrors[keyof DocumentFileErrors];
+
+export type DocumentFileResponses = {
+    /**
+     * Contenu du fichier (pièce jointe).
+     */
+    200: Blob | File;
+};
+
+export type DocumentFileResponse = DocumentFileResponses[keyof DocumentFileResponses];
+
 export type ApiDocumentDownloadsGetCollectionData = {
     body?: never;
     path?: never;
@@ -4881,6 +4909,40 @@ export type ApiMediaIdPutResponses = {
 };
 
 export type ApiMediaIdPutResponse = ApiMediaIdPutResponses[keyof ApiMediaIdPutResponses];
+
+export type MediaFileData = {
+    body?: never;
+    path: {
+        /**
+         * Media identifier
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/api/media/{id}/file';
+};
+
+export type MediaFileErrors = {
+    /**
+     * Forbidden
+     */
+    403: ErrorJsonld;
+    /**
+     * Not found
+     */
+    404: ErrorJsonld;
+};
+
+export type MediaFileError = MediaFileErrors[keyof MediaFileErrors];
+
+export type MediaFileResponses = {
+    /**
+     * Contenu du fichier (en ligne si son type réel est sûr).
+     */
+    200: Blob | File;
+};
+
+export type MediaFileResponse = MediaFileResponses[keyof MediaFileResponses];
 
 export type ApiMediaViewsGetCollectionData = {
     body?: never;

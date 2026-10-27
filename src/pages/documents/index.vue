@@ -153,7 +153,6 @@ async function handleUpload() {
     fd.append('fileName',   uploadFile.value.name)
     fd.append('mimeType',   uploadFile.value.type || 'application/octet-stream')
     fd.append('fileSize',   String(uploadFile.value.size))
-    fd.append('filePath',   '')           // set server-side by processor
 
     await uploadDocument(fd)
     showUpload.value = false
