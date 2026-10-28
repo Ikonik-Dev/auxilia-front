@@ -150,9 +150,6 @@ async function handleUpload() {
     fd.append('file',       uploadFile.value)
     fd.append('title',      uploadTitle.value.trim())
     fd.append('visibility', uploadVisibility.value)
-    fd.append('fileName',   uploadFile.value.name)
-    fd.append('mimeType',   uploadFile.value.type || 'application/octet-stream')
-    fd.append('fileSize',   String(uploadFile.value.size))
 
     await uploadDocument(fd)
     showUpload.value = false

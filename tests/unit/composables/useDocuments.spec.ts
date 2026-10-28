@@ -40,7 +40,12 @@ describe('useDocuments.downloadDocument', () => {
   })
 
   it("ouvre /api/documents/{id}/file, pas le filePath", async () => {
-    const doc = { id: 5, filePath: 'uploads/documents/stockage.pdf' } as DocumentDocumentRead
+    // filePath ne fait plus partie du contrat de lecture : on le simule quand même,
+    // pour prouver qu'un champ de chemin reçu ne serait jamais utilisé.
+    const base: DocumentDocumentRead = {
+      id: 5, title: 'Doc', fileName: 'doc.pdf', mimeType: 'application/pdf', visibility: 'private',
+    }
+    const doc = Object.assign(base, { filePath: 'uploads/documents/stockage.pdf' })
     const { downloadDocument } = useDocuments()
 
     await downloadDocument(doc)

@@ -212,7 +212,6 @@ export type DocumentDocumentRead = {
     readonly id?: number;
     title: string;
     description?: string | null;
-    filePath: string;
     fileName: string;
     fileSize?: number | string | null;
     mimeType: string;
@@ -237,7 +236,6 @@ export type DocumentJsonldDocumentRead = HydraItemBaseSchema & {
     readonly id?: number;
     title: string;
     description?: string | null;
-    filePath: string;
     fileName: string;
     fileSize?: number | string | null;
     mimeType: string;
@@ -811,7 +809,6 @@ export type MediaMediaRead = {
     readonly id?: number;
     title: string;
     description?: string | null;
-    filePath: string;
     fileName: string;
     fileType: string;
     fileSize?: number | string | null;
@@ -844,7 +841,6 @@ export type MediaJsonldMediaRead = HydraItemBaseSchema & {
     readonly id?: number;
     title: string;
     description?: string | null;
-    filePath: string;
     fileName: string;
     fileType: string;
     fileSize?: number | string | null;
@@ -936,7 +932,6 @@ export type MessageAttachmentMessageAttachmentRead = {
 };
 
 export type MessageAttachmentMessageAttachmentWrite = {
-    filePath: string;
     fileName: string;
     fileSize?: number | string | null;
     mimeType: string;
@@ -1662,7 +1657,6 @@ export type ConstraintViolationJsonldWritable = HydraItemBaseSchema & {
 export type DocumentDocumentReadWritable = {
     title: string;
     description?: string | null;
-    filePath: string;
     fileName: string;
     fileSize?: number | string | null;
     mimeType: string;
@@ -1676,7 +1670,6 @@ export type DocumentDocumentReadWritable = {
 export type DocumentJsonldDocumentReadWritable = HydraItemBaseSchema & {
     title: string;
     description?: string | null;
-    filePath: string;
     fileName: string;
     fileSize?: number | string | null;
     mimeType: string;
@@ -1972,7 +1965,6 @@ export type LessonCompletionJsonldLessonCompletionReadWritable = HydraItemBaseSc
 export type MediaMediaReadWritable = {
     title: string;
     description?: string | null;
-    filePath: string;
     fileName: string;
     fileType: string;
     fileSize?: number | string | null;
@@ -1988,7 +1980,6 @@ export type MediaMediaReadWritable = {
 export type MediaJsonldMediaReadWritable = HydraItemBaseSchema & {
     title: string;
     description?: string | null;
-    filePath: string;
     fileName: string;
     fileType: string;
     fileSize?: number | string | null;
